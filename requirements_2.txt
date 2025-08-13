@@ -1,0 +1,4 @@
+opencv-python>=4.6
+numpy>=1.23
+ultralytics>=8.0.0   # provides YOLOv8 (optional: if using ONNX replace this line with onnxruntime)
+scipy>=1.8
