@@ -230,6 +230,41 @@ class ONNXDetector:
 
             # apply classwise NMS and return
             return self._nms_and_format(results)
+# ####################################################################################################################################
+#         if C == 5:
+#             # This format assumes a single class, so class_id is always 0.
+#             for i in range(N):
+#                 row = preds[i]
+#                 conf = float(row[4])
+                
+#                 if conf < self.conf_thres:
+#                     continue
+
+#                 class_id = 0 # Hardcoded for single-class models
+                
+#                 x_c, y_c, w, h = float(row[0]), float(row[1]), float(row[2]), float(row[3])
+                
+#                 x1 = x_c - w/2
+#                 y1 = y_c - h/2
+#                 x2 = x_c + w/2
+#                 y2 = y_c + h/2
+
+#                 # Unpad and scale to original image dimensions
+#                 x1 = (x1 - pad_x) / ratio
+#                 x2 = (x2 - pad_x) / ratio
+#                 y1 = (y1 - pad_y) / ratio
+#                 y2 = (y2 - pad_y) / ratio
+
+#                 results.append({
+#                     'bbox': [float(x1), float(y1), float(x2), float(y2)],
+#                     'conf': conf,
+#                     'class_id': class_id,
+#                     'class_name': self.class_names.get(class_id, str(class_id))
+#                 })
+            
+#             # Apply NMS and return the filtered detections
+#             return self._nms_and_format(results)    
+            #############################################################################################################
 
         # Case: [x1,y1,x2,y2, conf, class_id]
         if C == 6:
