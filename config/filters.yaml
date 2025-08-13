@@ -1,0 +1,70 @@
+# filters.yaml - sample presets
+filters:
+  all_vehicles:
+    type: combine
+    mode: or
+    filters:
+      - type: class
+        classes: ['car','truck','bus','van','motorbike','motorcycle']
+
+  white_cars:
+    type: combine
+    mode: and
+    filters:
+      - type: class
+        classes: ['car']
+      - type: color
+        color: white
+        params:
+          sat_thresh: 65
+          val_thresh: 170
+          min_frac: 0.18
+
+  black_cars:
+    type: combine
+    mode: and
+    filters:
+      - type: class
+        classes: ['car']
+      - type: color
+        color: black
+        params:
+          val_thresh: 70
+          sat_thresh: 120
+          min_frac: 0.12
+
+  red_cars:
+    type: combine
+    mode: and
+    filters:
+      - type: class
+        classes: ['car']
+      - type: color
+        color: red
+        params:
+          hue_ranges: [[0,8],[170,180]]
+          sat_min: 80
+          val_min: 70
+          min_frac: 0.06
+
+  trucks:
+    type: class
+    classes: ['truck','bus','van']
+
+  personal_vehicles_color_white_or_black:
+    type: combine
+    mode: and
+    filters:
+      - type: class
+        classes: ['car','van']
+      - type: combine
+        mode: or
+        filters:
+          - type: color
+            color: white
+            params:
+              min_frac: 0.14
+          - type: color
+            color: black
+            params:
+              min_frac: 0.12
