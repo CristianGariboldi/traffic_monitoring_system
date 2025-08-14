@@ -46,8 +46,6 @@ def parse_args():
     p.add_argument('--fps-sync', action='store_true', help='match display to source FPS')
     p.add_argument('--homography', default=None,
                 help='path to homography JSON file with image_points and world_points (meters)')
-    p.add_argument('--ref-car-length', type=float, default=4.5,
-                help='(meters) fallback average car length used to estimate approx scale if no homography supplied. Use 0 to disable fallback.')
     p.add_argument('--speed-smooth-alpha', type=float, default=0.6,
                 help='EMA alpha for speed smoothing (0..1). If 0 use median smoothing.')
     return p.parse_args()
