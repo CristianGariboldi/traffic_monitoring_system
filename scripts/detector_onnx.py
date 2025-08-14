@@ -117,6 +117,100 @@ class ONNXDetector:
         img = np.expand_dims(img, 0).astype(np.float32)
         return img, ratio, pad_x, pad_y
 
+############################## USE THIS ONLY WITH BEST_YOLO.ONNX ##########################################################
+    # def _interpret_and_convert(self, preds, ratio, pad_x, pad_y, orig_shape):
+    #     """
+    #     Convert raw preds tensor into list of {bbox, conf, class_id, class_name}
+    #     Handles common ONNX layouts.
+    #     """
+    #     if preds is None:
+    #         return []
+
+    #     preds = np.asarray(preds)
+
+    #     if self.debug:
+    #         print("[ONNXDetector] raw preds shape before reshape:", preds.shape)
+
+    #     # Transpose from (1, C, N) to (1, N, C) if necessary
+    #     if preds.ndim == 3 and preds.shape[0] == 1 and preds.shape[1] < preds.shape[2]:
+    #         preds = preds.transpose(0, 2, 1)
+    #         if self.debug:
+    #             print("[ONNXDetector] transposed preds to:", preds.shape)
+
+    #     # Squeeze batch dimension, so we have (N, C)
+    #     if preds.ndim == 3 and preds.shape[0] == 1:
+    #         preds = preds[0]
+
+    #     if preds.ndim != 2:
+    #         if self.debug:
+    #             print(f"[ONNXDetector] Unexpected preds shape after processing: {preds.shape}. Returning empty.")
+    #         return []
+
+    #     N, C = preds.shape
+    #     if self.debug:
+    #         print(f"[ONNXDetector] interpreting preds as (N,C)=({N},{C})")
+
+    #     results = []
+        
+    #     # NEW PARSING LOGIC for [x,y,w,h, class1_conf, class2_conf, ...] format
+    #     if C > 4:
+    #         # Bounding box coordinates are the first 4 columns
+    #         boxes = preds[:, :4]
+    #         # Class scores are the remaining columns
+    #         scores = preds[:, 4:]
+
+    #         # For each detection, find the class with the highest score
+    #         class_ids = np.argmax(scores, axis=1)
+    #         max_scores = np.max(scores, axis=1)
+
+    #         # Filter out detections below the confidence threshold
+    #         keep = max_scores >= self.conf_thres
+            
+    #         if not np.any(keep):
+    #             return []
+
+    #         # Process only the detections that passed the threshold
+    #         for i in range(len(keep)):
+    #             if not keep[i]:
+    #                 continue
+
+    #             score = float(max_scores[i])
+    #             class_id = int(class_ids[i])
+    #             box = boxes[i]
+
+    #             x_c, y_c, w, h = float(box[0]), float(box[1]), float(box[2]), float(box[3])
+                
+    #             # Convert from center-width-height to x1-y1-x2-y2
+    #             x1 = x_c - w/2
+    #             y1 = y_c - h/2
+    #             x2 = x_c + w/2
+    #             y2 = y_c + h/2
+
+    #             # Unpad and scale back to original image dimensions
+    #             x1 = (x1 - pad_x) / ratio
+    #             x2 = (x2 - pad_x) / ratio
+    #             y1 = (y1 - pad_y) / ratio
+    #             y2 = (y2 - pad_y) / ratio
+
+    #             results.append({
+    #                 'bbox': [float(x1), float(y1), float(x2), float(y2)],
+    #                 'conf': score,
+    #                 'class_id': class_id,
+    #                 'class_name': self.class_names.get(class_id, str(class_id))
+    #             })
+
+    #         return self._nms_and_format(results)
+
+    #     # Fallback for any other unexpected format
+    #     if self.debug:
+    #         print("[ONNXDetector] fallback: could not parse preds format. Returning empty.")
+    #     return []
+
+##############################################################################################333
+
+
+
+#################### USE THIS WITH BASE YOLO MODEL ############################################
     def _interpret_and_convert(self, preds, ratio, pad_x, pad_y, orig_shape):
         """
         Convert raw preds tensor into list of {bbox, conf, class_id, class_name}
@@ -230,41 +324,6 @@ class ONNXDetector:
 
             # apply classwise NMS and return
             return self._nms_and_format(results)
-# ####################################################################################################################################
-#         if C == 5:
-#             # This format assumes a single class, so class_id is always 0.
-#             for i in range(N):
-#                 row = preds[i]
-#                 conf = float(row[4])
-                
-#                 if conf < self.conf_thres:
-#                     continue
-
-#                 class_id = 0 # Hardcoded for single-class models
-                
-#                 x_c, y_c, w, h = float(row[0]), float(row[1]), float(row[2]), float(row[3])
-                
-#                 x1 = x_c - w/2
-#                 y1 = y_c - h/2
-#                 x2 = x_c + w/2
-#                 y2 = y_c + h/2
-
-#                 # Unpad and scale to original image dimensions
-#                 x1 = (x1 - pad_x) / ratio
-#                 x2 = (x2 - pad_x) / ratio
-#                 y1 = (y1 - pad_y) / ratio
-#                 y2 = (y2 - pad_y) / ratio
-
-#                 results.append({
-#                     'bbox': [float(x1), float(y1), float(x2), float(y2)],
-#                     'conf': conf,
-#                     'class_id': class_id,
-#                     'class_name': self.class_names.get(class_id, str(class_id))
-#                 })
-            
-#             # Apply NMS and return the filtered detections
-#             return self._nms_and_format(results)    
-            #############################################################################################################
 
         # Case: [x1,y1,x2,y2, conf, class_id]
         if C == 6:

@@ -29,6 +29,19 @@ except Exception:
 
 ALLOWED_CLASSES = {'car', 'truck', 'bus', 'van', 'motorbike', 'motorcycle'}
 
+
+###############3 USE THIS ONLY WITH BEST_YOLO.ONNX ######################3
+# ALLOWED_CLASSES = {'bus', 'car', 'truck'}
+
+# # 2. ADD THIS dictionary to define your custom model's class names
+# # This maps the model's output IDs (0, 1, 2) to their names.
+# CUSTOM_CLASS_NAMES = {
+#     0: 'bus', 
+#     1: 'car', 
+#     2: 'truck'
+# }
+#################################################################
+
 def parse_args():
     p = argparse.ArgumentParser(description="Two-gate counting with auto-calibration and config-driven filters")
     p.add_argument('--source', '-s', default=0, help='video file or camera index')
@@ -74,7 +87,12 @@ def main():
     frame_time = 1.0 / fps
 
     # create detector (ONNXDetector)
+    ######################### USE THIS ONLY WITH BEST_YOLO.ONNX ##########################
+    # detector = Detector(args.model, input_size=640, providers=['CPUExecutionProvider'], conf_thres=args.conf, class_names=CUSTOM_CLASS_NAMES, debug=args.debug)
+    #########################################################
+
     detector = Detector(args.model, input_size=640, providers=['CPUExecutionProvider'], conf_thres=args.conf, debug=args.debug)
+
     tracker = CentroidTracker(max_missed=12, max_distance=140)
 
     # load filter if requested
