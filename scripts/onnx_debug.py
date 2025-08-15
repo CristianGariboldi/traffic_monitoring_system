@@ -1,7 +1,7 @@
 # onnx_debug.py
 import cv2, numpy as np, onnxruntime as ort, sys, os
 from detector_onnx import ONNXDetector as Detector# path to your onnx file (change if necessary)
-ONNX_PATH = 'models/best_yolo2.onnx'
+ONNX_PATH = 'models/yolo11n_ft.onnx'
 IMG_PATH = 'data/output.jpg'  # or use first frame from your video
 
 if not os.path.exists(ONNX_PATH):

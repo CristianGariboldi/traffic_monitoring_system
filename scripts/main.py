@@ -30,7 +30,7 @@ except Exception:
 ALLOWED_CLASSES = {'car', 'truck', 'bus', 'van', 'motorbike', 'motorcycle'}
 
 
-###############3 USE THIS ONLY WITH BEST_YOLO.ONNX ######################3
+# ###############3 USE THIS ONLY WITH BEST_YOLO.ONNX ######################3
 # ALLOWED_CLASSES = {'bus', 'car', 'truck'}
 
 # # 2. ADD THIS dictionary to define your custom model's class names
@@ -40,15 +40,28 @@ ALLOWED_CLASSES = {'car', 'truck', 'bus', 'van', 'motorbike', 'motorcycle'}
 #     1: 'car', 
 #     2: 'truck'
 # }
+
+
+# ALLOWED_CLASSES = {'car', 'motorbike', 'truck', 'bus', 'bike'}
+
+# # 2. UPDATE this dictionary to define your new model's class names and IDs.
+# #    This must match the order in your data.yaml file exactly.
+# CUSTOM_CLASS_NAMES = {
+#     0: 'car', 
+#     1: 'motorbike', 
+#     2: 'truck',
+#     3: 'bus',
+#     4: 'bike'
+# }
 #################################################################
 
 def parse_args():
     p = argparse.ArgumentParser(description="Two-gate counting with auto-calibration and config-driven filters")
-    p.add_argument('--source', '-s', default=0, help='video file or camera index')
+    p.add_argument('--source', '-s', default="./data/Video.mp4", help='video file or camera index')
     p.add_argument('--model', default='./models/yolo11n.onnx', help='ONNX model path')
     p.add_argument('--conf', type=float, default=0.35, help='detection confidence threshold (0..1)')
     p.add_argument('--debug', action='store_true', help='print debug info')
-    p.add_argument('--filter-config', default=None, help='path to filters YAML/JSON config')
+    p.add_argument('--filter-config', default="./config/filters.yaml", help='path to filters YAML/JSON config')
     p.add_argument('--filter-name', default=None, help='named filter in config (if omitted, no filter => count all)')
     p.add_argument('--white-only', action='store_true', help='legacy: if set, count only white cars using old heuristic')
     p.add_argument('--auto-calib', action='store_true', help='auto-calibrate gate positions from first frames')
@@ -57,7 +70,7 @@ def parse_args():
     p.add_argument('--calib-bottom-q', type=float, default=0.80, help='bottom quantile for gate placement (0..1)')
     p.add_argument('--seq-window', type=float, default=3.0, help='seconds allowed between two gate entries')
     p.add_argument('--fps-sync', action='store_true', help='match display to source FPS')
-    p.add_argument('--homography', default=None,
+    p.add_argument('--homography', default="./config/homography.json",
                 help='path to homography JSON file with image_points and world_points (meters)')
     p.add_argument('--speed-smooth-alpha', type=float, default=0.6,
                 help='EMA alpha for speed smoothing (0..1). If 0 use median smoothing.')
