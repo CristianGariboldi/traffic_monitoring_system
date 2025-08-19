@@ -36,6 +36,6 @@ def eval_baseline(dataset_npz):
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
-    p.add_argument('--dataset', default='dataset.npz')
+    p.add_argument('--dataset', default='./data/dataset.npz')
     args = p.parse_args()
     eval_baseline(args.dataset)

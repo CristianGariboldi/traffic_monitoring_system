@@ -20,7 +20,7 @@ ALLOWED_CLASSES = {'car', 'truck', 'bus', 'van', 'motorbike', 'motorcycle'}
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--source', '-s', default="./data/Video.mp4")
-    p.add_argument('--model', default='./models/yolo11s.onnx')
+    p.add_argument('--model', default='./models/yolo11n.onnx')
     p.add_argument('--out', default='./data/gt_tracks.json')
     p.add_argument('--conf', type=float, default=0.35)
     p.add_argument('--max-frames', type=int, default=0, help='0 => full video')

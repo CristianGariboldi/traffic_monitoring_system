@@ -1,20 +1,20 @@
 {
   "image_points": [
     [
-      87,
-      387
+      90,
+      389
     ],
     [
-      311,
-      414
+      310,
+      417
     ],
     [
-      352,
-      297
+      344,
+      317
     ],
     [
-      234,
-      274
+      195,
+      300
     ]
   ],
   "world_points": [
@@ -28,16 +28,16 @@
     ],
     [
       7.2,
-      40
+      25
     ],
     [
       0,
-      40
+      25
     ]
   ],
   "units": "meters",
   "description": "Homography calibration for vehicle speed detection",
-  "created_at": "2025-08-14T10:04:52.590Z",
+  "created_at": "2025-08-19T02:17:54.687Z",
   "image_dimensions": [
     800,
     450

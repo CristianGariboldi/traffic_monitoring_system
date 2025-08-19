@@ -307,13 +307,13 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
 # ---------------------
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--dataset', default='dataset.npz', help='dataset from prepare_dataset.py')
-    p.add_argument('--model', required=True, help='predictor.onnx or checkpoint.pth')
+    p.add_argument('--dataset', default='./data/dataset.npz', help='dataset from prepare_dataset.py')
+    p.add_argument('--model', default="./models/predictor.onnx", help='predictor.onnx or checkpoint.pth')
     p.add_argument('--use-onnx', type=lambda s: s.lower() in ('1','true','yes'), default=True)
     p.add_argument('--device', default='cpu')
-    p.add_argument('--vis-n', type=int, default=0, help='write PNG visualizations for first N samples (0 = none)')
+    p.add_argument('--vis-n', type=int, default=30, help='write PNG visualizations for first N samples (0 = none)')
     p.add_argument('--vis-dir', default='vis')
-    p.add_argument('--out', default='pred_results.json')
+    p.add_argument('--out', default='./data/pred_results.json')
     return p.parse_args()
 
 if __name__ == "__main__":

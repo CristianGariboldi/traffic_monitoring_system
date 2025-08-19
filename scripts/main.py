@@ -30,7 +30,7 @@ except Exception:
 ALLOWED_CLASSES = {'car', 'truck', 'bus', 'van', 'motorbike', 'motorcycle'}
 
 
-# ###############3 USE THIS ONLY WITH BEST_YOLO.ONNX ######################3
+# # ###############3 USE THIS ONLY WITH BEST_YOLO.ONNX ######################3
 # ALLOWED_CLASSES = {'bus', 'car', 'truck'}
 
 # # 2. ADD THIS dictionary to define your custom model's class names

@@ -82,14 +82,14 @@ def eval_model(model, loader, device):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--dataset', default='dataset.npz')
+    p.add_argument('--dataset', default='./data/dataset.npz')
     p.add_argument('--epochs', type=int, default=40)
     p.add_argument('--batch', type=int, default=128)
     p.add_argument('--lr', type=float, default=1e-3)
     p.add_argument('--d_model', type=int, default=128)
     p.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
     p.add_argument('--val-split', type=float, default=0.1)
-    p.add_argument('--out', default='checkpoint.pth')
+    p.add_argument('--out', default='./data/checkpoint.pth')
     args = p.parse_args()
 
     ds = TrajDataset(args.dataset, normalize=True)
