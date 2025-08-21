@@ -2,3 +2,7 @@ opencv-python>=4.6
 numpy>=1.23
 onnxruntime-gpu==1.22.0
 scipy>=1.8
+torch==2.8.0
+onnx==1.18.0
+tqdm==4.67.1
+Pillow==11.2.1

@@ -1,16 +1,4 @@
 # detector_onnx.py
-"""
-Robust ONNXRuntime detector wrapper for Ultralytics-style YOLO ONNX exports.
-Replace the previous file with this one.
-
-Usage:
-    det = ONNXDetector('models/yolov8n.onnx', input_size=640, providers=['CPUExecutionProvider'], conf_thres=0.25, debug=True)
-    det.detect(frame) -> list of dicts { 'bbox':[x1,y1,x2,y2], 'conf': float, 'class_name': str }
-
-Notes:
- - This wrapper auto-detects several ONNX output formats and adapts.
- - If no detections appear, enable debug=True and run a single frame to inspect the raw output.
-"""
 
 import os
 import numpy as np

@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""
-export_gt.py
 
-Run detector + tracker across a video and write a GT JSON file with per-frame tracked positions.
-
-Usage:
-    python3 export_gt.py --source ./data/Video.mp4 --model ./models/yolo11n.onnx --out gt_tracks.json --max-frames 1000 --debug
-"""
 
 import argparse
 import time

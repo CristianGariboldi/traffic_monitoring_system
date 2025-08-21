@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-predict_eval_cleanvis.py (updated fixes)
-
-Cleaner visualization for prediction evaluation:
- - predicted future positions: cyan dots (shown only while prediction horizons are still future)
- - GT future positions: green dots (if GT exists)
- - bbox label includes ID and avg prediction error for most recent prediction for that track (if available)
- - supports two modes: 'gt' (recommended) and 'live' (run detector+tracker live)
- 
-Fixes in this version:
- - prediction records are purged per-record once their horizons expire
- - in live mode predictions are evaluated immediately against GT if GT has entries for the future frames
-"""
 
 import argparse
 import json

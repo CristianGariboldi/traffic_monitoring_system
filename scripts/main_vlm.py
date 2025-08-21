@@ -1,22 +1,4 @@
 #!/usr/bin/env python3
-"""
-main_vlm.py
-
-Two-gate counting + speed estimation (same behavior as main_2) with optional VLM-based
-scene analysis that runs every N seconds and overlays a "System Status" text on the frames.
-
-Usage example:
-  python3 main_vlm.py --source ./data/Video.mp4 --model ./models/yolo11n.onnx \
-      --conf 0.25 --auto-calib --filter-config config/filters.yaml --filter-name white_cars \
-      --vlm-enable --vlm-interval 8 --vlm-onnx-dir onnx
-
-Important:
- - Put your VLM ONNX files in the folder pointed by --vlm-onnx-dir:
-     vision_encoder.onnx
-     embed_tokens.onnx
-     decoder_model_merged.onnx
- - The VLM model loading & generation structure is kept intentionally similar to your example.
-"""
 
 import argparse
 import time

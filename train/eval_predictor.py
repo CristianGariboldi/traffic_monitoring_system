@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""
-eval_predictor_on_dataset.py
 
-Usage examples:
-  # ONNX evaluation (recommended)
-  python3 eval_predictor_on_dataset.py --dataset dataset.npz --model predictor.onnx --use-onnx True --vis-n 20 --out results.json
-
-  # PyTorch checkpoint evaluation
-  python3 eval_predictor_on_dataset.py --dataset dataset.npz --model checkpoint.pth --use-onnx False --device cpu
-
-Notes:
-  - n_obs must match the original training n_obs (dataset was prepared with that).
-  - model should have been exported with n_in = n_obs - 1 (deltas length).
-"""
 import argparse, json, os, math
 import numpy as np
 from pathlib import Path

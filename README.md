@@ -42,6 +42,8 @@ you can add other filters name such as "red_cars", "trucks" etc:
 python3 ./scripts/main.py --filter-config ./config/filters.yaml --filter-name trucks
 ```
 
+In "data" folder I have attached different videos, feel free to pass their path into the scripts to test the software for different scenarios.
+
 
 ### Fine-tuned model (optional)
 best_yolo.onnx is the fine tuned version (only 3 classes)
@@ -141,7 +143,7 @@ Install the necessary libraries:
 
 ```
 
-pip install transformers onnxruntime-gpu numpy Pillow requests jinja2
+pip install transformers onnxruntime-gpu numpy requests jinja2
 ```
 ### Step 2: Download the ONNX Model Files (Terminal)
 Now, let's download the pre-converted ONNX files for the SmolVLM model.
@@ -169,7 +171,7 @@ how to run:
 python3 ./scripts/main_vlm.py --vlm-enable
 ```
 
-You can play with different text prompts, by modifying line 224 in main_vlm.py.
+You can play with different text prompts, by modifying line 206 in main_vlm.py.
 
 
 ## Big VLM Environment

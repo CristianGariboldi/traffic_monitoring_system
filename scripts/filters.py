@@ -1,13 +1,5 @@
 # filters.py
-"""
-Modular filter system for detection -> is_countable decision.
-Supports:
- - ColorFilter (white, black, red, blue, etc.) using HSV heuristics
- - ClassFilter (allowlist of class names)
- - AreaFilter (min / max bbox area)
- - CombinedFilter (AND / OR composition)
- - load_filter_from_config(config_path, name) to build from YAML/JSON
-"""
+
 
 import os
 import json

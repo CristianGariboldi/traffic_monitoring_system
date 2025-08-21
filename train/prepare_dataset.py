@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""
-prepare_dataset.py
-
-Convert GT JSON (exported by export_gt.py) into supervised training samples.
-Each sample is a contiguous subsequence belonging to the same track of length n_obs + m_pred.
-We represent positions as pixel centroids. The model will learn to predict future displacements
-(dx,dy) relative to the last observed point (or relative to previous frame).
-Output is saved as dataset.npz containing:
-  X_past: (N, n_obs, 2)
-  Y_fut:  (N, m_pred, 2)
-  meta: list of dicts with 'track_id' and 'start_frame'
-"""
 
 import argparse
 import json
