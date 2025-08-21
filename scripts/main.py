@@ -41,18 +41,6 @@ ALLOWED_CLASSES = {'car', 'truck', 'bus', 'van', 'motorbike', 'motorcycle'}
 #     2: 'truck'
 # }
 
-
-# ALLOWED_CLASSES = {'car', 'motorbike', 'truck', 'bus', 'bike'}
-
-# # 2. UPDATE this dictionary to define your new model's class names and IDs.
-# #    This must match the order in your data.yaml file exactly.
-# CUSTOM_CLASS_NAMES = {
-#     0: 'car', 
-#     1: 'motorbike', 
-#     2: 'truck',
-#     3: 'bus',
-#     4: 'bike'
-# }
 #################################################################
 
 def parse_args():

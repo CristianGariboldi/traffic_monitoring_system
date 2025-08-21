@@ -1,6 +1,6 @@
 # Einride_Challenge
 
-Please check the technical report here, there are detailed explanations of designed model.
+Please check the technical report [Download the PDF file](./docs/Einride_Challenge.pdf), there are detailed explanations of designed model.
 
 Before proceeding, let's create a clean conda environment:
 
@@ -23,7 +23,7 @@ How to run
 python3 ./scripts/main.py
 ```
 
-there are many arguments, auto calibration:
+there are many arguments, for example the activation of auto calibration of the virtual gates for counting vehicles:
 
 ```
 python3 ./scripts/main.py --auto-calib
@@ -36,19 +36,24 @@ How to filter specific vehicles' count:
 python3 ./scripts/main.py --filter-config ./config/filters.yaml --filter-name white_cars
 ```
 
-you can add other filters name such as "red_cars", "trucks" etc.
+you can add other filters name such as "red_cars", "trucks" etc:
+
+```
+python3 ./scripts/main.py --filter-config ./config/filters.yaml --filter-name trucks
+```
 
 
 ### Fine-tuned model (optional)
 best_yolo.onnx is the fine tuned version (only 3 classes)
-to run it, first uncomment these lines in main.py, then add its path by default here (or as terminal argument) and run:
+to run it, first uncomment these lines 34-42 in main.py, and run:
 
 ```
-python3 ./scripts/main.py
+python3 ./scripts/main.py --model ./models/best_yolo.onnx
 ```
 
 
-### homography
+
+### Homography Interactive Tool
 in order to do speed estimation, we need homography.json
 how to run:
 
@@ -164,7 +169,7 @@ how to run:
 python3 ./scripts/main_vlm.py --vlm-enable
 ```
 
-You can play with different text prompts, by modifying this line.
+You can play with different text prompts, by modifying line 224 in main_vlm.py.
 
 
 ## Big VLM Environment
@@ -177,7 +182,7 @@ For running this VLM, let's first setup a new clean environment:
 conda create -n Einride_VLM python=3.10 -y
 conda activate Einride_VLM
 
-pip install -r requirements_VLM.txt
+pip install -r requirements_vlm.txt
 ```
 
 Now, install PyTorch and TorchVision (other torch and cuda versions are compatible, for example I am using torch==2.0.7 and cuda==12.8 with the RTX 5090):
@@ -185,7 +190,7 @@ Now, install PyTorch and TorchVision (other torch and cuda versions are compatib
 pip install torch==2.0.1+cu118 torchvision==0.15.2+cu118 torchaudio==2.0.2+cu118 --index-url https://download.pytorch.org/whl/cu118
 ```
 
-Before running the code, move into **"data"** folder. There are 2 subfolders, namely:
+Before running the code, move into **"VLM_model"** folder. There are 2 subfolders, namely:
 
 1) CLIP
 2) llava34b
@@ -212,3 +217,5 @@ chmod +x ./run_calibrate_vlm.sh
 
 ./run_calibrate_vlm.sh
 ```
+
+Make sure to add the right paths in both scripts before running.
