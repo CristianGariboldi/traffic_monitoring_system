@@ -192,7 +192,7 @@ def load_gt(gt_path):
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--gt', default="./data/gt_tracks.json", help='GT file path (from export_gt.py)')
-    p.add_argument('--mode', choices=['gt', 'live'], default='live', help='gt: feed GT positions to predictor. live: run detector+tracker live.')
+    p.add_argument('--mode', choices=['gt', 'live'], default='gt', help='gt: feed GT positions to predictor. live: run detector+tracker live.')
     p.add_argument('--source', default='./data/Video.mp4', help='video (used in live mode)')
     p.add_argument('--model', default='./models/yolo11n.onnx', help='detection model (live mode)')
     p.add_argument('--conf', type=float, default=0.35)

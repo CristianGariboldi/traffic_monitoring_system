@@ -206,8 +206,8 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
     errors_by_h = [[] for _ in range(m_pred)]
     all_results = []
     vis_dir = Path(vis_dir)
-    if vis_n > 0:
-        vis_dir.mkdir(parents=True, exist_ok=True)
+    # if vis_n > 0:
+        # vis_dir.mkdir(parents=True, exist_ok=True)
 
     for i in tqdm(range(N), desc="predict"):
         past = X[i]   # (n_obs,2)
@@ -265,7 +265,7 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
                 px,py = pred[h]
                 gx,gy = fut[h]
                 draw.text((px-minx+6, py-miny-6), f"h{h+1}:{errs[h]:.1f}px", fill=(200,200,200), font=font)
-            img.save(vis_dir / f"sample_{i:05d}.png")
+            # img.save(vis_dir / f"sample_{i:05d}.png")
 
     # compute per-horizon metrics
     maes = []

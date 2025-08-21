@@ -120,6 +120,7 @@ def main():
         print(f"  val MAE per horizon: {np.array2string(val_mae, precision=2, separator=',')}")
         if val_loss < best_val - 1e-6:
             best_val = val_loss
+
             torch.save({'model_state': model.state_dict(), 'args': vars(args)}, args.out)
             print("  Saved best model ->", args.out)
             wait = 0

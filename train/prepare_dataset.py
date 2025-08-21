@@ -90,8 +90,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--gt', default='./data/gt_tracks.json')
     p.add_argument('--out', default='./data/dataset.npz')
-    p.add_argument('--n-obs', type=int, default=8)
-    p.add_argument('--m-pred', type=int, default=12)
+    p.add_argument('--n-obs', type=int, default=6)
+    p.add_argument('--m-pred', type=int, default=10)
     args = p.parse_args()
 
     tracks = load_gt(args.gt)

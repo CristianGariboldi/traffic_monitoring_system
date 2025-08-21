@@ -10,8 +10,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--checkpoint', default='./data/checkpoint.pth')
     p.add_argument('--out', default='./models/predictor.onnx')
-    p.add_argument('--n-in', type=int, default=7)
-    p.add_argument('--m-pred', type=int, default=12)
+    p.add_argument('--n-in', type=int, default=5)
+    p.add_argument('--m-pred', type=int, default=10)
     p.add_argument('--d-model', type=int, default=128)
     args = p.parse_args()
 
