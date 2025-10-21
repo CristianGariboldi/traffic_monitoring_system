@@ -9,7 +9,6 @@ def load_gt(gt_path):
     with open(gt_path, 'r') as fh:
         j = json.load(fh)
     frames = j.get('frames', [])
-    # build mapping track_id -> sorted list of (frame_idx, (cx,cy))
     tracks = defaultdict(list)
     for rec in frames:
         fi = int(rec['frame_idx'])
@@ -17,7 +16,6 @@ def load_gt(gt_path):
             tid = int(t['id'])
             cx, cy = int(round(t['centroid'][0])), int(round(t['centroid'][1]))
             tracks[tid].append((fi, (float(cx), float(cy))))
-    # sort times
     for tid, seq in tracks.items():
         seq.sort(key=lambda x: x[0])
     return tracks
@@ -34,10 +32,8 @@ def build_samples(tracks, n_obs=8, m_pred=12, min_seq_len=None):
         L = len(seq)
         if L < min_seq_len:
             continue
-        # sliding windows where frames are contiguous (no missing frames)
         for s in range(0, L - (n_obs + m_pred) + 1):
             window_frames = frames[s:s + n_obs + m_pred]
-            # check contiguous frames
             ok = True
             for i in range(1, len(window_frames)):
                 if window_frames[i] != window_frames[i-1] + 1:
@@ -69,7 +65,6 @@ def compute_relative_deltas(X, Y):
     We'll produce model inputs of shape (N, n_obs-1, 2) and targets (N, m_pred, 2)
     """
     last = X[:, -1:, :]  # (N, 1, 2)
-    # deltas of past consecutive frames
     dX = X[:, 1:, :] - X[:, :-1, :]  # (N, n_obs-1, 2)
     Yrel = Y - last  # (N, m_pred, 2)
     return dX, Yrel
@@ -85,10 +80,8 @@ def main():
     tracks = load_gt(args.gt)
     X, Y, meta = build_samples(tracks, n_obs=args.n_obs, m_pred=args.m_pred)
     dX, Yrel = compute_relative_deltas(X, Y)
-    # normalization: compute global scale (std) on deltas to normalize training
     dx_mean = np.mean(dX, axis=(0,1))
     dx_std = np.std(dX, axis=(0,1)) + 1e-6
-    # we will store stats for later use in inference
     stats = {'dx_mean': dx_mean.tolist(), 'dx_std': dx_std.tolist()}
     np.savez_compressed(args.out, X=X, Y=Y, dX=dX, Yrel=Yrel, meta=meta, stats=stats)
     print(f"Saved dataset to {args.out} -> samples={X.shape[0]} input_shape={dX.shape} target_shape={Yrel.shape}")

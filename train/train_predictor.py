@@ -17,12 +17,10 @@ from model import TrajectoryTransformer
 class TrajDataset(Dataset):
     def __init__(self, npz_path, normalize=True):
         d = np.load(npz_path, allow_pickle=True)
-        # read dX (N, n_in, 2) and Yrel (N, m_pred, 2)
         self.X = d['dX'].astype(np.float32)
         self.Y = d['Yrel'].astype(np.float32)
         self.meta = d.get('meta', None)
         self.stats = d.get('stats', None)
-        # normalization using stats computed in prepare_dataset
         if normalize and self.stats is not None:
             mu = np.array(self.stats.item()['dx_mean'], dtype=np.float32)
             sd = np.array(self.stats.item()['dx_std'], dtype=np.float32)
@@ -40,7 +38,6 @@ class TrajDataset(Dataset):
         return self.X[idx], self.Y[idx]
 
 def mae_per_horizon(preds, targets):
-    # preds, targets: (B, m, 2)
     errs = np.linalg.norm(preds - targets, axis=2)  # (B,m)
     mae = np.mean(errs, axis=0)
     return mae
@@ -52,7 +49,7 @@ def train_epoch(model, loader, opt, device, loss_fn):
         xb = xb.to(device)
         yb = yb.to(device)
         opt.zero_grad()
-        out = model(xb)  # predicted displacements (relative to last obs)
+        out = model(xb)  
         loss = loss_fn(out, yb)
         loss.backward()
         opt.step()
@@ -102,7 +99,6 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=args.batch, shuffle=False, num_workers=2, pin_memory=True)
     sample_x, _ = ds[0]
     n_in = sample_x.shape[0]
-    # load Y to know m_pred
     tmp = np.load(args.dataset, allow_pickle=True)
     m_pred = tmp['Yrel'].shape[1]
 

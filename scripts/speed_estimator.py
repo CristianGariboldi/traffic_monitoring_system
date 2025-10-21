@@ -1,4 +1,3 @@
-# speed_estimator.py
 import json
 import numpy as np
 import cv2
@@ -31,9 +30,7 @@ class SpeedEstimator:
         self.history_len = int(history_len)
         self.smooth_alpha = float(smooth_alpha) if smooth_alpha is not None else None
 
-        # dict: track_id -> deque of (ts, image_pt (x,y), world_pt (X,Y))
         self.hist = {}
-        # dict: track_id -> current smoothed speed (m/s)
         self.smoothed_speed = {}
 
     @staticmethod
@@ -60,7 +57,6 @@ class SpeedEstimator:
             self.hist[track_id] = deque(maxlen=self.history_len)
             self.smoothed_speed[track_id] = None
 
-        # compute world pt
         world_pt = None
         if self.H is not None:
             try:
@@ -69,17 +65,13 @@ class SpeedEstimator:
                 world_pt = None
 
         if world_pt is None and self.fallback_m_per_px is not None:
-            # fallback: approximate world coords by simple scaling of pixel coords (x,y) -> (x*scale, y*scale)
             sx = image_pt[0] * self.fallback_m_per_px
             sy = image_pt[1] * self.fallback_m_per_px
             world_pt = (sx, sy)
 
-        # push into history
         self.hist[track_id].append((ts, (float(image_pt[0]), float(image_pt[1])), (float(world_pt[0]), float(world_pt[1])) if world_pt is not None else (None, None)))
 
-        # compute speed from last two valid world points
         speed_m_s = None
-        # find last two entries with valid world coords
         items = list(self.hist[track_id])
         valid = [(t, w) for (t, ip, w) in items if w[0] is not None and w[1] is not None]
         if len(valid) >= 2:
@@ -92,11 +84,9 @@ class SpeedEstimator:
                 dist = ((x1-x0)**2 + (y1-y0)**2)**0.5
                 speed_m_s = dist / dt
 
-        # update EMA / median smoothing
         if speed_m_s is not None:
             prev = self.smoothed_speed.get(track_id, None)
             if self.smooth_alpha is None:
-                # median of last few instantaneous speeds
                 inst = []
                 for i in range(1, len(valid)):
                     (ta, (xa,ya)) = valid[i-1]

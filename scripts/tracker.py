@@ -8,21 +8,19 @@ class Track:
         self.id = tid
         self.bbox = bbox  # [x1,y1,x2,y2]
         self.class_name = class_name
-        self.is_countable = is_countable  # whether this track should be counted (white personal car)
+        self.is_countable = is_countable  
         self.centroid = self._bottom_center(bbox)
         self.hits = 1
         self.miss = 0
         self.counted = False
-        self.history = deque(maxlen=max_history)  # list of centroids (tuples)
+        self.history = deque(maxlen=max_history)  
         self.history.append(self.centroid)
-        # gate-state for robust gate detection
-        self.inside_gates = set()                 # set of gate ids currently inside
-        self.gate_history = deque(maxlen=50)      # entries (gate_id, timestamp) when entering gates
+        self.inside_gates = set()                 
+        self.gate_history = deque(maxlen=50)      
 
     def _bottom_center(self, bbox):
         x1, y1, x2, y2 = bbox
         cx = int((x1 + x2) / 2)
-        # bottom-center uses bottom y (y2) to better represent ground contact
         return (cx, int(y2))
 
     def update(self, bbox, class_name=None, is_countable=None):
@@ -31,7 +29,6 @@ class Track:
         if class_name is not None:
             self.class_name = class_name
         if is_countable is not None:
-            # once True keep True; otherwise don't override True with False
             self.is_countable = bool(self.is_countable or is_countable)
         self.hits += 1
         self.miss = 0
@@ -53,7 +50,6 @@ class Track:
         Called when track centroid enters a gate (from outside to inside).
         We record the event only on entry.
         """
-        # if already inside, ignore
         if gate_id in self.inside_gates:
             return
         self.inside_gates.add(gate_id)
@@ -108,14 +104,12 @@ class CentroidTracker:
         track_ids = list(self.tracks.keys())
         track_centroids = [ self.tracks[tid].centroid for tid in track_ids ]
 
-        # no existing tracks: create new ones for each detection
         if len(track_centroids) == 0:
             for bbox, cls, cnt in zip(det_bboxes, det_classes, det_countable):
                 self.tracks[self.next_id] = Track(self.next_id, bbox, class_name=cls, is_countable=cnt)
                 self.next_id += 1
             return list(self.tracks.values())
 
-        # no detections: mark all tracks missed
         if len(det_centroids) == 0:
             for tid in list(track_ids):
                 if tid in self.tracks:
@@ -141,7 +135,6 @@ class CentroidTracker:
                     assigned_tracks.add(tid)
                     assigned_dets.add(c)
 
-        # unmatched detections -> new tracks
         for i, bbox in enumerate(det_bboxes):
             if i not in assigned_dets:
                 self.tracks[self.next_id] = Track(self.next_id, bbox,
@@ -149,7 +142,6 @@ class CentroidTracker:
                                                  is_countable=det_countable[i])
                 self.next_id += 1
 
-        # unmatched tracks -> mark missed, maybe delete later
         for tid in list(track_ids):
             if tid not in assigned_tracks:
                 if tid in self.tracks:
@@ -159,7 +151,6 @@ class CentroidTracker:
 
         return list(self.tracks.values())
 
-    # simple point-line sign check kept for optional use
     @staticmethod
     def point_line_sign(pt, line_p1, line_p2):
         x, y = pt

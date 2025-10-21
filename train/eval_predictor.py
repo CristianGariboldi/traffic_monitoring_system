@@ -6,7 +6,6 @@ from pathlib import Path
 from tqdm import tqdm
 from PIL import Image, ImageDraw, ImageFont
 
-# optional: onnxruntime & torch imports done lazily inside PredictorWrapper
 try:
     import onnxruntime as ort
 except Exception:
@@ -17,9 +16,7 @@ try:
 except Exception:
     torch = None
 
-# ---------------------
-# PredictorWrapper (ONNX or PyTorch)
-# ---------------------
+
 import json
 class PredictorWrapper:
     def __init__(self, model_path, dataset_npz, use_onnx=True, device='cpu'):
@@ -27,29 +24,23 @@ class PredictorWrapper:
         self.device = device
         self.use_onnx = bool(use_onnx) and model_path.endswith('.onnx')
 
-        # load stats from dataset.npz (robust)
         npz = np.load(dataset_npz, allow_pickle=True)
         stats = None
         if 'stats' in npz:
             stats_obj = npz['stats']
-            # case 1: plain dict already
             if isinstance(stats_obj, dict):
                 stats = stats_obj
-            # case 2: numpy 0-d object array containing a dict -> use .item()
             elif isinstance(stats_obj, np.ndarray):
                 try:
-                    maybe = stats_obj.item()  # often extracts the original dict
+                    maybe = stats_obj.item()  
                     if isinstance(maybe, dict):
                         stats = maybe
                     else:
-                        # maybe a structured array or list-like
                         try:
                             stats = dict(maybe)
                         except Exception:
-                            # fallback to tolist()
                             try:
                                 stats = stats_obj.tolist()
-                                # if tolist returns list of pairs, try dict()
                                 if isinstance(stats, list):
                                     try:
                                         stats = dict(stats)
@@ -58,7 +49,6 @@ class PredictorWrapper:
                             except Exception:
                                 stats = None
                 except Exception:
-                    # try tolist() as last resort
                     try:
                         stats = stats_obj.tolist()
                         if isinstance(stats, list):
@@ -68,22 +58,18 @@ class PredictorWrapper:
                                 pass
                     except Exception:
                         stats = None
-            # case 3: possibly a JSON string stored in the file
             elif isinstance(stats_obj, (str, bytes)):
                 try:
                     stats = json.loads(stats_obj)
                 except Exception:
                     stats = None
             else:
-                # last attempt: try to convert to python container
                 try:
                     stats = dict(stats_obj)
                 except Exception:
                     stats = None
 
-        # final check
         if stats is None:
-            # helpful debug info for the user
             raise RuntimeError(
                 "Failed to parse 'stats' from dataset file '{}'.\n"
                 "When creating dataset.npz ensure you saved a dict under 'stats', e.g.:\n"
@@ -94,14 +80,12 @@ class PredictorWrapper:
                 .format(dataset_npz)
             )
 
-        # now stats should be a mapping-like with 'dx_mean' and 'dx_std'
         try:
             self.mu = np.array(stats['dx_mean'], dtype=np.float32)
             self.sd = np.array(stats['dx_std'], dtype=np.float32) + 1e-8
         except Exception as e:
             raise RuntimeError(f"Parsed 'stats' object but missing expected keys: {e}. Parsed stats: {stats}")
 
-        # initialize model/session
         if self.use_onnx:
             if ort is None:
                 raise RuntimeError("onnxruntime not available in this environment but use_onnx=True")
@@ -117,11 +101,9 @@ class PredictorWrapper:
             ck = torch.load(model_path, map_location=device)
             from model import TrajectoryTransformer
             args = ck.get('args', {}) or {}
-            # try to infer shapes from args or dataset
             n_in = args.get('n_in', None)
             m_pred = args.get('m_pred', None)
             if n_in is None or m_pred is None:
-                # infer from dataset
                 dX = npz.get('dX', None)
                 Yrel = npz.get('Yrel', None)
                 if dX is None or Yrel is None:
@@ -167,19 +149,15 @@ class PredictorWrapper:
             with torch.no_grad():
                 out = self.model(x)
             pred_deltas = out.cpu().numpy()[0]
-        # model was trained to output future displacements relative to last observed pos
         last = np.asarray(past_abs[-1], dtype=np.float32).reshape((1,2))
         pred_abs = pred_deltas + last
         return pred_abs
 
-# ---------------------
-# Evaluation + visualization routine
-# ---------------------
+
 def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n=0, vis_dir='vis', save_results='results.json'):
     arr = np.load(dataset_path, allow_pickle=True)
-    # dataset created in prepare_dataset: X (N,n_obs,2), Y (N,m_pred,2), dX, Yrel, meta
-    X = arr['X']       # absolute past positions (N, n_obs, 2)
-    Y = arr['Y']       # absolute future positions (N, m_pred, 2)
+    X = arr['X']       
+    Y = arr['Y']       
     meta = arr.get('meta', None)
     N = X.shape[0]
     n_obs = X.shape[1]
@@ -189,7 +167,6 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
 
     pw = PredictorWrapper(model_path=model_path, dataset_npz=dataset_path, use_onnx=use_onnx, device=device)
 
-    # accumulate errors per horizon
     errors_by_h = [[] for _ in range(m_pred)]
     all_results = []
     vis_dir = Path(vis_dir)
@@ -220,9 +197,7 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
         }
         all_results.append(res)
 
-        # visualization for first vis_n samples: create simple image plotting points
         if vis_n > 0 and i < vis_n:
-            # make a canvas slightly larger than bounding box of past+future
             pts = np.vstack([past, fut, pred])
             minx = int(np.min(pts[:,0]) - 30)
             maxx = int(np.max(pts[:,0]) + 30)
@@ -238,23 +213,18 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
                 font = ImageFont.truetype("DejaVuSans.ttf", 14)
             except:
                 font = ImageFont.load_default()
-            # draw past (white), future GT (green), predicted (cyan)
             for (x,y) in past:
                 draw.ellipse((x-minx-3, y-miny-3, x-minx+3, y-miny+3), fill=(255,255,255))
             for (x,y) in fut:
                 draw.ellipse((x-minx-3, y-miny-3, x-minx+3, y-miny+3), fill=(0,180,0))
             for (x,y) in pred:
                 draw.ellipse((x-minx-3, y-miny-3, x-minx+3, y-miny+3), fill=(200,220,255))
-            # labels
             draw.text((8,8), f"sample {i}  meta:{meta_i}", fill=(220,220,220), font=font)
-            # per-horizon errors
             for h in range(m_pred):
                 px,py = pred[h]
                 gx,gy = fut[h]
                 draw.text((px-minx+6, py-miny-6), f"h{h+1}:{errs[h]:.1f}px", fill=(200,200,200), font=font)
-            # img.save(vis_dir / f"sample_{i:05d}.png")
 
-    # compute per-horizon metrics
     maes = []
     rmses = []
     counts = []
@@ -267,12 +237,10 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
             rmses.append(float(math.sqrt((arrh*arrh).mean())))
             counts.append(int(arrh.size))
 
-    # summary print
     print("Per-horizon metrics (pixels):")
     for h in range(m_pred):
         print(f"h{h+1}: count={counts[h]} MAE={maes[h] if maes[h] is not None else 'na'} RMSE={rmses[h] if rmses[h] is not None else 'na'}")
 
-    # save results json (light)
     if save_results:
         out = {
             'model': model_path,
@@ -281,7 +249,7 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
             'n_obs': n_obs,
             'm_pred': m_pred,
             'per_h': [{'h': h+1, 'count': counts[h], 'mae_px': maes[h], 'rmse_px': rmses[h]} for h in range(m_pred)],
-            'samples': all_results[:1000]  # limit saving to first 1000 samples to avoid huge files
+            'samples': all_results[:1000]  
         }
         with open(save_results, 'w') as fh:
             json.dump(out, fh, indent=2)
@@ -289,9 +257,7 @@ def eval_on_dataset(dataset_path, model_path, use_onnx=True, device='cpu', vis_n
 
     return maes, rmses, counts
 
-# ---------------------
-# CLI
-# ---------------------
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--dataset', default='./data/dataset.npz', help='dataset from prepare_dataset.py')

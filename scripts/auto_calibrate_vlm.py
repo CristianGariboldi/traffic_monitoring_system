@@ -3,7 +3,6 @@
 auto_calibrate_vlm.py - Uses a VLM with Chain-of-Thought prompting to
 automatically generate homography calibration points from a single image.
 """
-# --- Add the project root to Python's path ---
 import sys
 import os
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +15,6 @@ from PIL import Image
 import json
 import re
 
-# VLM Imports for the LLaVA-34B model from llava_next
 from llava_next.llava.mm_utils import process_images, tokenizer_image_token
 from llava_next.llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 from llava_next.llava.conversation import conv_templates
@@ -69,9 +67,7 @@ def query_llava(image_obj, question, tokenizer, model, image_processor):
     response = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
     return response
 
-# #################################################################
-# --- FIX: Improved Helper Function for Parsing VLM Output ---
-# #################################################################
+
 
 def parse_vlm_response_for_json(response_text):
     """
@@ -89,7 +85,6 @@ def parse_vlm_response_for_json(response_text):
 
     json_string = json_match.group(1)
     
-    # --- FIX: Replace single quotes with double quotes to create valid JSON ---
     json_string = json_string.replace("'", '"')
     
     try:
@@ -105,9 +100,7 @@ def parse_vlm_response_for_json(response_text):
         print(f"--- Extracted String: ---\n{json_string}\n-------------------------")
         return None
 
-# #################################################################
-# --- FIX: Improved Prompt Engineering ---
-# #################################################################
+
 
 def create_calibration_prompt(image_width, image_height):
     """

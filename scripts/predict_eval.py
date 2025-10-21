@@ -8,11 +8,9 @@ from collections import defaultdict, deque
 import numpy as np
 import cv2
 
-# reuse CentroidTracker and ONNXDetector
 from tracker import CentroidTracker
 from detector_onnx import ONNXDetector as Detector
 
-# --- lightweight Kalman2D (same as earlier) ---
 class Kalman2D:
     def __init__(self, x=0.0, y=0.0, vx=0.0, vy=0.0, dt=1/25.0,
                  proc_var_pos=1.0, proc_var_vel=1.0, meas_var=4.0):
@@ -53,7 +51,6 @@ class Kalman2D:
         k.dt = self.dt
         return k
 
-# --- PredictionManager with per-record error storage + purge logic ---
 class PredictionManager:
     def __init__(self, fps=25.0, n_obs=4, m_pred=8, predict_interval=6, debug=False, purge_margin=0):
         self.fps = float(fps)
@@ -63,10 +60,8 @@ class PredictionManager:
         self.predict_interval = int(predict_interval)
         self.debug = bool(debug)
 
-        self.kfs = {}  # per-id Kalman
-        self.hist = defaultdict(lambda: deque(maxlen=200))  # id -> deque((frame_idx, ts, (x,y)))
-        # pred_records: id -> list of events; each event has:
-        # {'frame_idx', 'ts', 'predictions':[(x,y)...], 'errors':[err or None,...], 'avg_error':float or None}
+        self.kfs = {}  
+        self.hist = defaultdict(lambda: deque(maxlen=200))  
         self.pred_records = defaultdict(list)
         self.errors_by_horizon = defaultdict(list)
         self.pred_count = 0
@@ -105,7 +100,6 @@ class PredictionManager:
                     px,py = kf_copy.current_position()
                     preds.append((float(px), float(py)))
                 rec = {'frame_idx': frame_idx, 'ts': ts, 'predictions': preds, 'errors': [None]*len(preds), 'avg_error': None}
-                # if gt_by_frame provided evaluate right away (works for live mode too)
                 if gt_by_frame is not None:
                     errs = []
                     for h_idx, (px,py) in enumerate(preds, start=1):
@@ -142,13 +136,11 @@ class PredictionManager:
             if new_recs:
                 self.pred_records[tid] = new_recs
             else:
-                # remove key entirely if no recs left
                 del self.pred_records[tid]
 
     def cleanup_track(self, tid):
         if tid in self.kfs: del self.kfs[tid]
         if tid in self.hist: del self.hist[tid]
-        # keep pred_records for possible visualization until they expire
 
     def metrics(self):
         out = {}
@@ -161,7 +153,6 @@ class PredictionManager:
                 out[h] = {'count': int(a.size), 'mae_px': float(a.mean()), 'rmse_px': float(math.sqrt((a*a).mean()))}
         return out
 
-# --- load GT file utils ---
 def load_gt(gt_path):
     with open(gt_path, 'r') as fh:
         j = json.load(fh)
@@ -175,7 +166,6 @@ def load_gt(gt_path):
         gt_by_frame[fi] = mapping
     return frames, gt_by_frame
 
-# --- main script args ---
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument('--gt', default="./data/gt_tracks.json", help='GT file path (from export_gt.py)')
@@ -201,7 +191,6 @@ def main():
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     dt = 1.0 / fps
 
-    # live mode detector/tracker
     if args.mode == 'live':
         detector = Detector(args.model, input_size=640, providers=['CPUExecutionProvider'], conf_thres=args.conf, debug=args.debug)
         tracker = CentroidTracker(max_missed=12, max_distance=140)
@@ -209,7 +198,6 @@ def main():
     pm = PredictionManager(fps=fps, n_obs=args.n_obs, m_pred=args.m_pred, predict_interval=args.predict_interval, debug=args.debug, purge_margin=args.purge_margin)
 
     frame_idx = 0
-    # we will show only recent records -> but they are purged more aggressively now
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -229,7 +217,6 @@ def main():
             tracks = tracker.update(all_dets)
             obs_tracks = tracks
         else:
-            # GT mode: iterate GT track entries
             mapping = gt_by_frame.get(frame_idx, {})
             obs_tracks = []
             for sid, info in mapping.items():
@@ -244,27 +231,20 @@ def main():
                 tr.centroid = (int(round(cx)), int(round(cy)))
                 obs_tracks.append(tr)
 
-        # update PM with observations and possibly make predictions
         for t in obs_tracks:
             pm.update_observation(t.id, t.centroid[0], t.centroid[1], frame_idx, ts)
-            # now pass gt_by_frame even in live mode so immediate evaluation can happen if GT exists
             pm.maybe_predict(t.id, frame_idx, ts, gt_by_frame=gt_by_frame)
 
-        # cleanup PM tracks not seen now
         active_ids = set([t.id for t in obs_tracks])
         for tid in list(pm.kfs.keys()):
             if tid not in active_ids:
                 pm.cleanup_track(tid)
 
-        # purge expired prediction records so they don't linger after their horizons pass
         pm.purge_expired_records(frame_idx)
 
-        # Drawing:
-        # 1) draw current detections/tracks and bbox label with accuracy (most recent rec)
         for t in obs_tracks:
             x1,y1,x2,y2 = map(int, t.bbox)
             cv2.rectangle(frame, (x1,y1), (x2,y2), (0,200,0), 2)
-            # compute accuracy text using most recent prediction record for this track (if any)
             recent_recs = pm.pred_records.get(t.id, [])
             acc_txt = "e=-"
             if recent_recs:
@@ -272,7 +252,6 @@ def main():
                 if last_rec.get('avg_error') is not None:
                     acc_txt = f"e={last_rec['avg_error']:.1f}px"
                 else:
-                    # if no avg_error but h1 error exists, show h1
                     if len(last_rec.get('errors', [])) >= 1 and last_rec['errors'][0] is not None:
                         acc_txt = f"h1={last_rec['errors'][0]:.1f}px"
                     else:
@@ -281,20 +260,15 @@ def main():
             cv2.putText(frame, label, (x1, max(0,y1-6)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0,200,0), 1)
             cv2.circle(frame, t.centroid, 3, (0,200,0), -1)
 
-        # 2) draw predicted vs GT future points (no lines)
-        # Only draw prediction records that are still within their horizon window (they are purged otherwise)
         for tid, recs in pm.pred_records.items():
             for rec in recs:
                 start = rec['frame_idx']
-                # only show predictions if current frame is between start (inclusive) and start + m_pred (inclusive)
                 if not (frame_idx >= start and frame_idx <= start + pm.m_pred):
                     continue
                 preds = rec['predictions']
-                # draw predicted trajectory dots (cyan)
                 for (px,py) in preds:
                     p_pt = (int(round(px)), int(round(py)))
                     cv2.circle(frame, p_pt, 3, (255,200,0), -1)  # cyan
-                # draw GT future points (green) for horizons where GT exists
                 for h_idx, (px,py) in enumerate(preds, start=1):
                     gt_frame = start + h_idx
                     frame_gt = gt_by_frame.get(gt_frame)
@@ -305,11 +279,9 @@ def main():
                             g_pt = (int(round(gx)), int(round(gy)))
                             cv2.circle(frame, g_pt, 3, (0,255,0), -1)  # green
 
-        # 3) overlay aggregated metrics (compact)
         metrics = pm.metrics()
         y0 = 18
         cv2.putText(frame, f"PredCount:{pm.pred_count}", (10, y0), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
-        # only print first 6 horizons to not overcrowd
         max_show = min(6, pm.m_pred)
         for h in range(1, max_show+1):
             m = metrics[h]
@@ -327,7 +299,6 @@ def main():
             break
         frame_idx += 1
 
-    # End: print final metrics
     print("Final metrics (pixels):")
     final = pm.metrics()
     for h in range(1, pm.m_pred+1):

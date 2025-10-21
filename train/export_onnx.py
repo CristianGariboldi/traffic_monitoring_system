@@ -20,7 +20,6 @@ def main():
     model.load_state_dict(ck['model_state'])
     model.eval()
 
-    # dummy input: (1, n_in, 2)
     dummy = torch.randn(1, args.n_in, 2)
     torch.onnx.export(model, dummy, args.out,
                       input_names=['past_deltas'],

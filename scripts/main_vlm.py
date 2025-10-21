@@ -11,12 +11,10 @@ import traceback
 from pathlib import Path
 from PIL import Image, ImageOps
 
-# detector / tracker / speed estimator imports - assume these exist in the repo
 from detector_onnx import ONNXDetector as Detector
 from tracker import CentroidTracker
 from speed_estimator import SpeedEstimator, compute_homography_from_pairs
 
-# filters (optional)
 try:
     from filters import load_filter_from_config
     _HAS_FILTERS = True
@@ -24,7 +22,6 @@ except Exception:
     load_filter_from_config = None
     _HAS_FILTERS = False
 
-# legacy white heuristic fallback
 try:
     from color_filter import is_white_car as legacy_is_white_car
 except Exception:
@@ -69,9 +66,7 @@ def parse_args():
     return p.parse_args()
 
 
-# ----------------------
-# VLM worker (loads sessions and runs generation loop periodically)
-# ----------------------
+
 class VLMWorker:
     """
     Background thread that periodically runs a VLM generation on the most recent frame.
@@ -92,7 +87,6 @@ class VLMWorker:
         self._running = False
         self._thread = None
 
-        # VLM runtime objects (populated in load)
         self.config = None
         self.processor = None
         self.vision_session = None
@@ -104,7 +98,6 @@ class VLMWorker:
         self.head_dim = None
         self.num_hidden_layers = None
 
-        # keywords that trigger alert (lowercased)
         self.alert_keywords = [
             "accident", "collision", "stalled", "stopping", "stuck", "fire", "smoke",
             "flood", "pothole", "obstacle", "pedestrian", "cyclist", "bicycle", "roadblock",
@@ -114,24 +107,20 @@ class VLMWorker:
     def load(self):
         """Load VLM config/processor and ONNX sessions; keep structure like provided example."""
         try:
-            # lazy import to avoid importing heavy libs when VLM is disabled
             from transformers import AutoConfig, AutoProcessor
-            from transformers.image_utils import load_image  # kept for structural similarity
+            from transformers.image_utils import load_image 
             import onnxruntime
             import numpy as _np
         except Exception as e:
             raise RuntimeError("Failed to import VLM dependencies: " + str(e))
 
-        # --- 1. Load Models and Configuration ---
         if self.debug:
             print("[VLM] Loading models and processor...")
 
-        # Note: the example used a Hugging Face model id to load config/processor;
-        # we keep the same shape here so your existing processor files / config work.
+        
         self.config = AutoConfig.from_pretrained(self.model_id, trust_remote_code=True)
         self.processor = AutoProcessor.from_pretrained(self.model_id, trust_remote_code=True)
 
-        # ONNX sessions
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         vis_p = str(self.onnx_dir / "vision_encoder.onnx")
         emb_p = str(self.onnx_dir / "embed_tokens.onnx")
@@ -143,14 +132,12 @@ class VLMWorker:
         self.embed_session = onnxruntime.InferenceSession(emb_p, providers=providers)
         self.decoder_session = onnxruntime.InferenceSession(dec_p, providers=providers)
 
-        # extract a few config values used in generation loop
         num_key_value_heads = self.config.text_config.num_key_value_heads
         head_dim = self.config.text_config.head_dim
         num_hidden_layers = self.config.text_config.num_hidden_layers
         eos_token_id = self.config.text_config.eos_token_id
         image_token_id = self.config.image_token_id
 
-        # store them
         self.num_key_value_heads = num_key_value_heads
         self.head_dim = head_dim
         self.num_hidden_layers = num_hidden_layers
@@ -185,16 +172,13 @@ class VLMWorker:
     def submit_frame(self, frame_bgr):
         """Main loop can call this every frame; we just keep the latest frame."""
         with self._lock:
-            # copy minimal (avoid referencing external array that will be overwritten)
             self._last_frame = frame_bgr.copy()
-            # mark last_ts to prefer fresh frames
             self._last_ts = time.time()
 
     def get_latest_result(self):
         with self._lock:
             return self._last_result, self._last_ts, self._alert
 
-    # ---------- internal helpers ----------
     def _text_prompt_for_frame(self):
         """Return the messages/prompt to send to the VLM (you can tweak wording here)."""
         messages = [
@@ -223,7 +207,6 @@ class VLMWorker:
          - cleans common VLM tokens from the output,
          - gracefully handles empty outputs.
         """
-        # local imports to avoid heavy imports when VLM disabled
         from transformers import AutoProcessor
         import numpy as _np
 
@@ -233,7 +216,6 @@ class VLMWorker:
 
         batch_size = int(inputs['input_ids'].shape[0])
 
-        # initialize KV cache exactly like example
         past_key_values = {
             f'past_key_values.{layer}.{kv}': _np.zeros([batch_size, self.num_key_value_heads, 0, self.head_dim], dtype=_np.float32)
             for layer in range(self.num_hidden_layers)
@@ -246,15 +228,12 @@ class VLMWorker:
         position_ids = _np.cumsum(attention_mask, axis=-1) - 1
 
         max_new_tokens = 1280
-        # Keep same initial shape as the example: (batch, 0)
         generated_tokens = _np.empty((batch_size, 0), dtype=_np.int64)
 
         for i in range(max_new_tokens):
-            # text embeddings
             inputs_embeds = self.embed_session.run(None, {'input_ids': input_ids})[0]
 
             if image_features is None:
-                # keep original boolean conversion
                 image_features = self.vision_session.run(
                     None,
                     {
@@ -262,10 +241,8 @@ class VLMWorker:
                         'pixel_attention_mask': inputs['pixel_attention_mask'].astype(_np.bool_)
                     }
                 )[0]
-                # replace image token embedding with image features
                 inputs_embeds[inputs['input_ids'] == self.image_token_id] = image_features.reshape(-1, image_features.shape[-1])
 
-            # run decoder
             logits_and_present = self.decoder_session.run(None, dict(
                 inputs_embeds=inputs_embeds,
                 attention_mask=attention_mask,
@@ -275,12 +252,9 @@ class VLMWorker:
             logits = logits_and_present[0]
             present_key_values = logits_and_present[1:]
 
-            # next token (argmax)
-            next_token_id = logits[:, -1:].argmax(-1, keepdims=False)  # shape (batch,)
-            # prepend/append as column
+            next_token_id = logits[:, -1:].argmax(-1, keepdims=False)  
             generated_tokens = _np.concatenate([generated_tokens, next_token_id.reshape(batch_size, 1).astype(_np.int64)], axis=1)
 
-            # streaming debug (optional)
             if self.debug:
                 try:
                     token_text = self.processor.decode(next_token_id[0])
@@ -288,32 +262,24 @@ class VLMWorker:
                 except Exception:
                     pass
 
-            # stop if eos generated for all batch elements
             if (next_token_id == self.eos_token_id).all():
                 break
 
-            # prepare next iteration
             input_ids = next_token_id.reshape(batch_size, 1)
             attention_mask = _np.concatenate([attention_mask, _np.ones_like(input_ids)], axis=-1)
-            # position_ids update consistent with example (small hack to keep shape)
             position_ids = _np.array([[position_ids[:, -1][0] + 1]])
 
-            # update KV cache in insertion order (should match present_key_values)
             for j, key in enumerate(list(past_key_values.keys())):
                 past_key_values[key] = present_key_values[j]
 
-        # final decode (safe)
         try:
             final_answer = self.processor.batch_decode(generated_tokens)[0]
         except Exception:
-            # fallback: empty string if decoder fails
             final_answer = ""
 
-        # cleanup common model-control tokens and whitespace
         if final_answer is None:
             final_answer = ""
         cleaned = final_answer.replace('<end_of_utterance>', '').replace('<|im_end|>', '').strip()
-        # remove repeated trailing tokens sometimes emitted like " <|im_end|><|im_end|>"
         while cleaned.endswith('<|im_end|>') or cleaned.endswith('<end_of_utterance>'):
             cleaned = cleaned.rsplit('<', 1)[0].strip()
 
@@ -337,25 +303,19 @@ class VLMWorker:
 
             if frame_bgr is not None:
                 try:
-                    # convert to PIL Image RGB
                     pil = Image.fromarray(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB))
-                    # run vlm
                     answer = self._run_vlm_on_pil(pil)
 
-                    # detect keywords
                     alert = self._detect_alert_keywords(answer)
 
                     with self._lock:
-                        # store cleaned answer and alert flag
                         self._last_result = answer.strip() if answer is not None else ""
                         self._alert = bool(alert)
                         self._last_ts = time.time()
 
-                    # ALWAYS print result to terminal for user visibility
                     ts_text = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self._last_ts))
                     print(f"\n[VLM @ {ts_text}] {self._last_result}\n")
                     if self.debug:
-                        # also print raw first 400 chars for debugging
                         print("[VLM debug] raw (first 400 chars):", (self._last_result or "")[:400])
 
                 except Exception as e:
@@ -372,9 +332,7 @@ class VLMWorker:
             time.sleep(to_sleep)
 
 
-# ----------------------
-# utility drawing for VLM overlay
-# ----------------------
+
 def draw_scene_overlay(frame, text, alert=False):
     """
     Draw a compact Scene Analysis overlay at top-left.
@@ -382,14 +340,11 @@ def draw_scene_overlay(frame, text, alert=False):
     - alert: if True, draw red header
     """
     H, W = frame.shape[:2]
-    # prepare small multiline text box
     lines = []
-    # naive wrap: split on sentences / commas, then cap length
     for seg in text.replace('\n', ' ').split('. '):
         seg = seg.strip()
         if not seg:
             continue
-        # chunk long sentences
         while len(seg) > 50:
             lines.append(seg[:50].strip())
             seg = seg[50:].strip()
@@ -400,28 +355,21 @@ def draw_scene_overlay(frame, text, alert=False):
     if len(lines) == 0:
         lines = ["No analysis available."]
 
-    # box dims
     pad = 8
     line_h = 18
     box_h = pad*2 + line_h * len(lines) + 20
     box_w = min(W - 20, 640)
-    # header color
     header_color = (0, 165, 0) if not alert else (0, 0, 255)
-    # box background
     cv2.rectangle(frame, (6, 6), (6 + box_w, 6 + box_h), (30, 30, 30), -1)
-    # header strip
     cv2.rectangle(frame, (6, 6), (6+box_w, 6+28), header_color, -1)
     cv2.putText(frame, "Scene Analysis", (12, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 2)
-    # text lines
     y = 6 + 28 + 6
     for ln in lines:
         cv2.putText(frame, ln, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (220,220,220), 1)
         y += line_h
 
 
-# ----------------------
-# main script (same high-level flow as your main_2)
-# ----------------------
+
 def main():
     args = parse_args()
     cap = cv2.VideoCapture(args.source)
@@ -432,11 +380,9 @@ def main():
     fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     frame_time = 1.0 / fps
 
-    # create detector (ONNXDetector)
     detector = Detector(args.model, input_size=640, providers=['CPUExecutionProvider'], conf_thres=args.conf, debug=args.debug)
     tracker = CentroidTracker(max_missed=12, max_distance=140)
 
-    # load filter if requested
     filter_obj = None
     if args.filter_config and args.filter_name:
         if not _HAS_FILTERS:
@@ -455,7 +401,6 @@ def main():
     count_out = 0
     seq_window = float(args.seq_window)
 
-    # calibration buffers & settings
     frame_idx = 0
     ys = []
     auto_calib = bool(args.auto_calib)
@@ -469,7 +414,6 @@ def main():
 
     prev_time = time.time()
 
-    # Setup speed estimator (homography or fallback)
     H_homography = None
     if args.homography:
         try:
@@ -487,7 +431,6 @@ def main():
     speed_est = SpeedEstimator(H=H_homography, fallback_m_per_px=fallback_m_per_px, history_len=8,
                             smooth_alpha=(args.speed_smooth_alpha if args.speed_smooth_alpha>0 else None))
 
-    # VLM worker: start only if requested
     vlm_worker = None
     if args.vlm_enable:
         vlm_worker = VLMWorker(onnx_dir=args.vlm_onnx_dir, model_id=args.vlm_model_id, interval=args.vlm_interval, debug=args.debug)
@@ -501,10 +444,8 @@ def main():
             if not ret:
                 break
 
-            # KEEP a pristine copy of the raw frame for the VLM (do this BEFORE any drawing)
-            raw_frame_for_vlm = frame  # no copy here; submit_frame makes its own copy
+            raw_frame_for_vlm = frame  
             if vlm_worker is not None:
-                # optional: downscale while preserving aspect ratio to reduce VLM IO
                 try:
                     h, w = raw_frame_for_vlm.shape[:2]
                     target_w = 640
@@ -517,7 +458,6 @@ def main():
                         vlm_img = raw_frame_for_vlm
                 except Exception:
                     vlm_img = raw_frame_for_vlm
-                # submit non-blocking; worker will copy the array under lock
                 try:
                     vlm_worker.submit_frame(vlm_img)
                 except Exception:
@@ -527,9 +467,7 @@ def main():
 
             H_img, W_img = frame.shape[:2]
 
-            # ----------------------------
-            # Auto-calibration phase
-            # ----------------------------
+            
             if auto_calib and frame_idx < calib_frames:
                 dets_tmp = detector.detect(frame)
                 for d in dets_tmp:
@@ -577,9 +515,7 @@ def main():
             top_gate = (0, max(0, top_y - gate_half_h), W_img - 1, min(H_img - 1, top_y + gate_half_h))
             bottom_gate = (0, max(0, bottom_y - gate_half_h), W_img - 1, min(H_img - 1, bottom_y + gate_half_h))
 
-            # ----------------------------
-            # Detection & tracking
-            # ----------------------------
+            
             dets = detector.detect(frame)
             all_dets_for_tracker = []
             for d in dets:
@@ -602,15 +538,12 @@ def main():
 
             tracks = tracker.update(all_dets_for_tracker)
 
-            # draw gates
             cv2.rectangle(frame, (top_gate[0], top_gate[1]), (top_gate[2], top_gate[3]), (0,255,0), 2)
             cv2.rectangle(frame, (bottom_gate[0], bottom_gate[1]), (bottom_gate[2], bottom_gate[3]), (0,0,255), 2)
 
-            # timestamp in seconds
             video_msec = cap.get(cv2.CAP_PROP_POS_MSEC)
             ts = (video_msec / 1000.0) if video_msec and video_msec > 0 else time.time()
 
-            # fallback m_per_px if no homography (set from first big car)
             if speed_est.H is None and speed_est.fallback_m_per_px is None and hasattr(args, 'ref_car_length') and getattr(args, 'ref_car_length', None):
                 for det in all_dets_for_tracker:
                     if det['class_name'] == 'car':
@@ -621,9 +554,7 @@ def main():
                             print("Set fallback m_per_px =", speed_est.fallback_m_per_px, "from pix width", pix_w)
                         break
 
-            # update per-track info
             for t in tracks:
-                # color (kept same as before)
                 if args.debug:
                     print(f"TRACK {t.id}: centroid={t.centroid} hits={t.hits} miss={t.miss} is_countable={t.is_countable} counted={t.counted}")
 
@@ -641,13 +572,11 @@ def main():
                 elif not inside_bottom_now and was_inside_bottom:
                     t.exit_gate('bottom')
 
-                # speed estimation
                 x1,y1,x2,y2 = t.bbox
                 img_pt = (((float(x1)+float(x2))/2.0), float(y2))
                 speed_kmh = speed_est.add_observation(t.id, img_pt, ts=ts)
                 t.speed_kmh = speed_kmh if speed_kmh is not None else None
 
-                # counting logic (unchanged)
                 if not t.counted:
                     recent = [ (g, tt) for g, tt in t.gate_history if (ts - tt) <= seq_window ]
                     if args.debug and recent:
@@ -680,13 +609,11 @@ def main():
                                 count_out += 1
                                 t.counted = True
 
-            # cleanup speed history for absent tracks
             active_ids = set([t.id for t in tracks])
             for tid in list(speed_est.hist.keys()):
                 if tid not in active_ids:
                     speed_est.remove_track(tid)
 
-            # find fastest
             fastest = None
             fastest_v = -1.0
             for t in tracks:
@@ -695,7 +622,6 @@ def main():
                         fastest_v = t.speed_kmh
                         fastest = t
 
-            # draw boxes and labels
             for t in tracks:
                 if t.class_name == 'car':
                     base_color = (0, 255, 0) if t.is_countable else (0, 255, 255)
@@ -721,7 +647,6 @@ def main():
                 except:
                     pass
 
-            # overlay counters & fps
             mode_desc = args.filter_name if args.filter_name else ('white-only' if legacy_is_white_car and args.white_only else 'all')
             cv2.putText(frame, f'Incoming ({mode_desc}): {count_in}', (12,30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
             cv2.putText(frame, f'Outgoing ({mode_desc}): {count_out}', (12,60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
@@ -731,19 +656,14 @@ def main():
             prev_time = now
             cv2.putText(frame, f'FPS: {fps_val:.1f}', (12,90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200,200,0), 2)
 
-            # submit the frame to VLM worker (non-blocking - it only stores the latest frame)
             if vlm_worker is not None:
-                # vlm_worker.submit_frame(frame)
 
-                # get latest VLM result (thread-safe)
                 vlm_text, vlm_ts, vlm_alert = vlm_worker.get_latest_result()
-                # if result is recent (within 2*interval) show else show placeholder
                 if (time.time() - vlm_ts) < max(2.0, args.vlm_interval * 2.0):
                     draw_scene_overlay(frame, vlm_text, alert=vlm_alert)
                 else:
                     draw_scene_overlay(frame, "Scene Analysis: pending...", alert=False)
 
-            # show and sync fps
             cv2.imshow('output', frame)
             if args.fps_sync:
                 elapsed = time.time() - start_frame

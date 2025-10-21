@@ -13,7 +13,6 @@ from tracker import CentroidTracker
 from speed_estimator import SpeedEstimator, compute_homography_from_pairs
 import json, os
 
-# Optional config-driven filters module (see filters.py)
 try:
     from filters import load_filter_from_config
     _HAS_FILTERS = True
@@ -21,7 +20,6 @@ except Exception:
     load_filter_from_config = None
     _HAS_FILTERS = False
 
-# Legacy color heuristic fallback
 try:
     from color_filter import is_white_car as legacy_is_white_car
 except Exception:
@@ -96,7 +94,6 @@ def main():
 
     tracker = CentroidTracker(max_missed=12, max_distance=140)
 
-    # load filter if requested
     filter_obj = None
     if args.filter_config and args.filter_name:
         if not _HAS_FILTERS:
@@ -115,15 +112,13 @@ def main():
     count_out = 0
     seq_window = float(args.seq_window)
 
-    # calibration buffers & settings
     frame_idx = 0
-    ys = []   # collected bottom-center y positions of detections
+    ys = []   
     auto_calib = bool(args.auto_calib)
     calib_frames = max(1, int(args.calib_frames))
     top_q = float(args.calib_top_q)
     bottom_q = float(args.calib_bottom_q)
 
-    # defaults if no calib
     default_top_frac = 0.65
     default_bottom_frac = 0.70
 
@@ -133,7 +128,6 @@ def main():
     prev_time = time.time()
 
     ########################################
-    # Setup speed estimator (homography or fallback)
     H_homography = None
     if args.homography:
         try:
@@ -148,9 +142,7 @@ def main():
             H_homography = None
 
     fallback_m_per_px = None
-    # fallback_m_per_px will be computed dynamically from first car bbox if H_homography is None
     if H_homography is None and (args.ref_car_length is None or args.ref_car_length <= 0):
-        # disable fallback explicitly if user set ref-car-length <= 0
         fallback_m_per_px = None
 
     speed_est = SpeedEstimator(H=H_homography, fallback_m_per_px=fallback_m_per_px, history_len=8,
@@ -165,9 +157,7 @@ def main():
 
         h_img, w_img = frame.shape[:2]
 
-        # ----------------------------
-        # Auto-calibration phase (collect bottom center Ys)
-        # ----------------------------
+    
         if auto_calib and frame_idx < calib_frames:
             dets_tmp = detector.detect(frame)
             for d in dets_tmp:
@@ -175,13 +165,11 @@ def main():
                 if cls not in ALLOWED_CLASSES:
                     continue
                 x1,y1,x2,y2 = d['bbox']
-                cy = int(y2)  # bottom-center y
+                cy = int(y2)  
                 ys.append(cy)
             frame_idx += 1
 
-            # overlay progress + interim lines (helpful)
             cv2.putText(frame, f'Auto-calibrating gates: {frame_idx}/{calib_frames}', (12,30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,255), 2)
-            # show two tentative horizontal guides at default fractions while collecting
             cv2.line(frame, (0, int(h_img*default_top_frac)), (w_img-1, int(h_img*default_top_frac)), (200,200,0), 1)
             cv2.line(frame, (0, int(h_img*default_bottom_frac)), (w_img-1, int(h_img*default_bottom_frac)), (200,200,0), 1)
 
@@ -193,14 +181,12 @@ def main():
             k = cv2.waitKey(1) & 0xFF
             if k == ord('q'):
                 break
-            continue  # collect more frames
+            continue  
 
-        # compute quantiles after calibration frames
         if auto_calib and top_y is None and frame_idx >= calib_frames:
             if len(ys) >= 4:
                 top_y = int(np.quantile(ys, top_q))
                 bottom_y = int(np.quantile(ys, bottom_q))
-                # ensure top_y < bottom_y (swap if quantiles inverted)
                 if top_y >= bottom_y:
                     med = int(np.median(ys))
                     span = max(10, int(0.12 * h_img))
@@ -209,26 +195,21 @@ def main():
                     if args.debug:
                         print("Calib quantiles were inverted; used median fallback.", med, span)
             else:
-                # not enough samples -> fallback to defaults
                 top_y = int(h_img * default_top_frac)
                 bottom_y = int(h_img * default_bottom_frac)
             auto_calib = False
             print(f"Auto-calibrated gates: top_y={top_y}, bottom_y={bottom_y}  (collected {len(ys)} samples)")
 
-        # fallback defaults if no calib or calib not run
         if top_y is None:
             top_y = int(h_img * default_top_frac)
         if bottom_y is None:
             bottom_y = int(h_img * default_bottom_frac)
 
-        # gate thickness (vertical half-height)
         gate_half_h = max(8, int(h_img * 0.02))
         top_gate = (0, max(0, top_y - gate_half_h), w_img - 1, min(h_img - 1, top_y + gate_half_h))
         bottom_gate = (0, max(0, bottom_y - gate_half_h), w_img - 1, min(h_img - 1, bottom_y + gate_half_h))
 
-        # ----------------------------
-        # Detection -> prepare tracker
-        # ----------------------------
+        
         dets = detector.detect(frame)
         all_dets_for_tracker = []
         for d in dets:
@@ -236,41 +217,32 @@ def main():
             if cls not in ALLOWED_CLASSES:
                 continue
 
-            # Determine is_countable based on config filter or legacy white-only or default-all
             is_countable = True
             if filter_obj is not None:
                 try:
                     is_countable = bool(filter_obj.match(frame, d['bbox'], cls))
                 except Exception:
-                    # if filter fails, treat as not countable
                     is_countable = False
             elif legacy_white_mode:
-                # legacy white-only using color_filter if available
                 if legacy_is_white_car is not None and cls == 'car':
                     is_countable = bool(legacy_is_white_car(frame, d['bbox']))
                 else:
                     is_countable = False
             else:
-                # no filter configured => count everything
                 is_countable = True
 
             all_dets_for_tracker.append({'bbox': d['bbox'], 'class_name': cls, 'is_countable': is_countable})
             if args.debug and not is_countable:
-                # sometimes useful to see skipped detections
                 print(f"DEBUG skip countable: cls={cls}, bbox={d['bbox']}, is_countable={is_countable}")
 
-        # Update tracker with detections
         tracks = tracker.update(all_dets_for_tracker)
 
-        # Draw full-width gates
         cv2.rectangle(frame, (top_gate[0], top_gate[1]), (top_gate[2], top_gate[3]), (0,255,0), 2)    # top - green
         cv2.rectangle(frame, (bottom_gate[0], bottom_gate[1]), (bottom_gate[2], bottom_gate[3]), (0,0,255), 2)  # bottom - red
 
-        # timestamp for this frame
         video_msec = cap.get(cv2.CAP_PROP_POS_MSEC)
         ts = (video_msec / 1000.0) if video_msec and video_msec > 0 else time.time()
 
-        # If no homography but we want fallback, try to set m_per_px from first sizable car detection(s)
         if speed_est.H is None and speed_est.fallback_m_per_px is None and args.ref_car_length and args.ref_car_length > 0:
             for det in all_dets_for_tracker:
                 if det['class_name'] == 'car':
@@ -281,9 +253,7 @@ def main():
                         print("Set fallback m_per_px =", speed_est.fallback_m_per_px, "from pix width", pix_w)
                     break
 
-        # iterate tracks: update speeds, gate events, counting
         for t in tracks:
-            # determine color mapping (we'll use the same later when drawing)
             if t.class_name == 'car':
                 color = (0, 255, 0) if t.is_countable else (0, 255, 255)
             elif t.class_name in ('truck','bus','van'):
@@ -296,7 +266,6 @@ def main():
             if args.debug:
                 print(f"TRACK {t.id}: centroid={t.centroid} hits={t.hits} miss={t.miss} is_countable={t.is_countable} counted={t.counted}")
 
-            # Top gate entry/exit
             inside_top_now = point_in_rect(t.centroid, top_gate)
             was_inside_top = ('top' in t.inside_gates)
             if inside_top_now and not was_inside_top:
@@ -308,7 +277,6 @@ def main():
                 if args.debug:
                     print(f"  Track {t.id} EXIT TOP at {ts:.2f}")
 
-            # Bottom gate entry/exit
             inside_bottom_now = point_in_rect(t.centroid, bottom_gate)
             was_inside_bottom = ('bottom' in t.inside_gates)
             if inside_bottom_now and not was_inside_bottom:
@@ -320,7 +288,6 @@ def main():
                 if args.debug:
                     print(f"  Track {t.id} EXIT BOTTOM at {ts:.2f}")
 
-            # Speed estimation: bottom-center image point
             x1,y1,x2,y2 = t.bbox
             img_pt = ( (float(x1) + float(x2)) / 2.0, float(y2) )
             speed_kmh = speed_est.add_observation(t.id, img_pt, ts=ts)
@@ -329,7 +296,6 @@ def main():
             else:
                 t.speed_kmh = None
 
-            # Evaluate sequence of gate entries (recent within seq_window)
             if not t.counted:
                 recent = [ (g, tt) for g, tt in t.gate_history if (ts - tt) <= seq_window ]
                 if args.debug and recent:
@@ -339,7 +305,6 @@ def main():
                     prev_gate, prev_ts = recent[-2]
                     last_gate, last_ts = recent[-1]
 
-                    # incoming: top -> bottom
                     if prev_gate == 'top' and last_gate == 'bottom':
                         if filter_obj is not None:
                             if t.is_countable:
@@ -360,13 +325,11 @@ def main():
                                 if args.debug:
                                     print(f"  SKIPPED IN Track {t.id} (not white)")
                         else:
-                            # no filter configured - count all
                             count_in += 1
                             t.counted = True
                             if args.debug:
                                 print(f"  COUNTED IN Track {t.id} (unfiltered)")
 
-                    # outgoing: bottom -> top
                     elif prev_gate == 'bottom' and last_gate == 'top':
                         if filter_obj is not None:
                             if t.is_countable:
@@ -392,13 +355,11 @@ def main():
                             if args.debug:
                                 print(f"  COUNTED OUT Track {t.id} (unfiltered)")
 
-        # Clean speed_est histories for tracks that disappeared
         active_ids = set([t.id for t in tracks])
         for tid in list(speed_est.hist.keys()):
             if tid not in active_ids:
                 speed_est.remove_track(tid)
 
-        # collect speeds -> find fastest
         fastest = None
         fastest_v = -1.0
         for t in tracks:
@@ -407,9 +368,7 @@ def main():
                     fastest_v = t.speed_kmh
                     fastest = t
 
-        # Now draw boxes + labels (single consolidated drawing step)
         for t in tracks:
-            # color same mapping as above
             if t.class_name == 'car':
                 base_color = (0, 255, 0) if t.is_countable else (0, 255, 255)
             elif t.class_name in ('truck','bus','van'):
@@ -419,9 +378,8 @@ def main():
             else:
                 base_color = (200,200,200)
 
-            # fastest highlight
             if fastest is not None and t.id == fastest.id:
-                box_color = (0,0,255)  # red highlight
+                box_color = (0,0,255)  
                 thickness = 3
             else:
                 box_color = base_color
@@ -430,13 +388,11 @@ def main():
             speed_txt = f"{t.speed_kmh:.1f}km/h" if (getattr(t, 'speed_kmh', None) is not None) else ""
             label = f'ID:{t.id} {t.class_name or ""} {speed_txt}'
             draw_box(frame, t.bbox, label=label, color=box_color, thickness=thickness)
-            # draw centroid small dot
             try:
                 cv2.circle(frame, t.centroid, 4, box_color, -1)
             except Exception:
                 pass
 
-        # overlay counters & fps
         mode_desc = args.filter_name if args.filter_name else ('white-only' if legacy_white_mode else 'all')
         cv2.putText(frame, f'Incoming ({mode_desc}): {count_in}', (12,30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
         cv2.putText(frame, f'Outgoing ({mode_desc}): {count_out}', (12,60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)

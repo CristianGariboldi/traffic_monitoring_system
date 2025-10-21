@@ -1,14 +1,11 @@
-# eval_baseline.py
 import numpy as np, math
 from tqdm import tqdm
 
 def baseline_predict(past, m_pred):
-    # past: (n_obs,2) absolute
-    # simple constant velocity (last delta) extrapolation
     if past.shape[0] < 2:
         last = past[-1]
         return np.tile(last.reshape(1,2), (m_pred,1))
-    last_delta = past[-1] - past[-2]   # per-frame displacement (px)
+    last_delta = past[-1] - past[-2]   
     last_pos = past[-1]
     preds = np.array([ last_pos + (i+1)*last_delta for i in range(m_pred) ], dtype=np.float32)
     return preds

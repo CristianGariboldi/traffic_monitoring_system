@@ -1,11 +1,9 @@
-# scripts/run_single_vlm_inference.py
 import argparse
 import torch
 from PIL import Image
 import sys
 import os
 
-# Add the project root to the Python path to find the 'llava_next' module
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
@@ -42,16 +40,13 @@ def main():
     parser.add_argument("--question", type=str, required=True)
     args = parser.parse_args()
 
-    # Load the model
     tokenizer, model, image_processor, _ = load_pretrained_model(
         args.model_path, None, "llava-v1.6-34b", load_4bit=True, device_map="auto", attn_implementation=None
     )
 
-    # Open the image and run the query
     image = Image.open(args.image_file).convert('RGB')
     response = query_llava(image, args.question, tokenizer, model, image_processor)
 
-    # Print the raw response to standard output so the main app can capture it
     print(response)
 
 if __name__ == "__main__":

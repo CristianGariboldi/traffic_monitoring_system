@@ -1,11 +1,9 @@
-# detector_onnx.py
 
 import os
 import numpy as np
 import onnxruntime as ort
 import cv2
 
-# COCO names fallback
 COCO_NAMES = {i: n for i, n in enumerate([
     'person','bicycle','car','motorbike','aeroplane','bus','train','truck','boat','traffic light',
     'fire hydrant','stop sign','parking meter','bench','bird','cat','dog','horse','sheep','cow',
@@ -17,9 +15,7 @@ COCO_NAMES = {i: n for i, n in enumerate([
     'microwave','oven','toaster','sink','refrigerator','book','clock','vase','scissors','teddy bear',
     'hair drier','toothbrush'])}
 
-# -------------------------
-# utility helpers
-# -------------------------
+
 def letterbox(im, new_shape=(640, 640), color=(114,114,114), scaleUp=True):
     # preserve aspect ratio, pad to new_shape
     shape = im.shape[:2]  # (h, w)
@@ -33,7 +29,6 @@ def letterbox(im, new_shape=(640, 640), color=(114,114,114), scaleUp=True):
     dh = new_shape[0] - new_unpad[1]
     dw /= 2
     dh /= 2
-    # resize
     if shape[::-1] != new_unpad:
         im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
@@ -42,7 +37,6 @@ def letterbox(im, new_shape=(640, 640), color=(114,114,114), scaleUp=True):
     return im, r, (left, top)
 
 def nms_simple(boxes, scores, iou_thres=0.45):
-    # simple NMS, returns indices to keep
     if boxes.shape[0] == 0:
         return []
     idxs = scores.argsort()[::-1]
@@ -69,9 +63,7 @@ def _bbox_iou(box, boxes):
     union = area1 + area2 - inter + 1e-6
     return inter / union
 
-# -------------------------
-# ONNX Detector class
-# -------------------------
+
 class ONNXDetector:
     def __init__(self, onnx_path, input_size=640, providers=None, conf_thres=0.25, iou_thres=0.45, class_names=None, debug=False):
         assert os.path.exists(onnx_path), f"ONNX model not found: {onnx_path}"
@@ -86,7 +78,6 @@ class ONNXDetector:
         self.session = ort.InferenceSession(onnx_path, providers=providers)
         self.input_name = self.session.get_inputs()[0].name
 
-        # class names
         if class_names is None:
             self.class_names = COCO_NAMES
         else:
@@ -212,24 +203,19 @@ class ONNXDetector:
         if preds is None:
             return []
 
-        # Normalize to numpy array
         preds = np.asarray(preds)
 
         if self.debug:
             print("[ONNXDetector] raw preds shape before reshape:", preds.shape)
 
-        # If shape is (1, C, N) and C is small while N is large -> transpose to (1, N, C)
         if preds.ndim == 3 and preds.shape[0] == 1 and preds.shape[1] < preds.shape[2]:
-            # common case from Ultralytics: (1, 84, 8400) => transpose to (1, 8400, 84)
             preds = preds.transpose(0, 2, 1)
             if self.debug:
                 print("[ONNXDetector] transposed preds to:", preds.shape)
 
-        # If preds is (1, N, C) -> squeeze batch dim
         if preds.ndim == 3 and preds.shape[0] == 1:
             preds = preds[0]
 
-        # ensure 2D
         if preds.ndim == 1:
             preds = preds.reshape(1, -1)
 
@@ -239,13 +225,10 @@ class ONNXDetector:
 
         results = []
 
-        # heuristic: number of classes (default COCO=80)
         num_classes_guess = max(80, C - 5)  # fallback
 
-        # Case: format [x_center, y_center, w, h, obj_conf, cls_scores...]
         if C >= 6 and (C - 5) <= 100:  # reasonable num classes
-            # if C == 5 + num_classes -> we expect obj_conf at index 4
-            # if C == 4 + num_classes -> likely no obj_conf, class scores start at 4
+            
             if C == 5 + 80 or C == 5 + (len(self.class_names)):
                 has_obj = True
                 cls_start = 5
@@ -253,18 +236,14 @@ class ONNXDetector:
                 has_obj = False
                 cls_start = 4
             else:
-                # guess based on values: check column 4 statistics
                 col4 = preds[:, 4]
-                # if col4 values mostly > 1e-3 and <=1.0 -> probably obj_conf. If col4 has large values up to input_size -> maybe coordinate
                 if np.nanmax(col4) <= 1.01:
                     has_obj = True
                     cls_start = 5
                 else:
-                    # assume no obj conf
                     has_obj = False
                     cls_start = 4
 
-            # detect whether coordinates are normalized (<=1) or in letterbox pixel scale
             coord_max = preds[:, :4].max()
             normalized_coords = coord_max <= 1.01
 
@@ -297,7 +276,6 @@ class ONNXDetector:
                 x2 = x_c + w/2
                 y2 = y_c + h/2
 
-                # unpad & scale to original image
                 x1 = (x1 - pad_x) / ratio
                 x2 = (x2 - pad_x) / ratio
                 y1 = (y1 - pad_y) / ratio
@@ -310,10 +288,8 @@ class ONNXDetector:
                     'class_name': self.class_names.get(int(class_id), str(int(class_id)))
                 })
 
-            # apply classwise NMS and return
             return self._nms_and_format(results)
 
-        # Case: [x1,y1,x2,y2, conf, class_id]
         if C == 6:
             coord_max = preds[:, :4].max()
             normalized_coords = coord_max <= 1.01
@@ -330,14 +306,12 @@ class ONNXDetector:
                     results.append({'bbox':[x1,y1,x2,y2], 'conf':conf, 'class_id':class_id, 'class_name': self.class_names.get(class_id, str(class_id))})
             return self._nms_and_format(results)
 
-        # Fallback: no parse -> return empty (debug prints already show shapes)
         if self.debug:
             print("[ONNXDetector] fallback: could not parse preds format. Returning empty.")
         return []
 
 
     def _nms_and_format(self, results):
-        # results: list of dicts with bbox/conf/class_id
         if len(results) == 0:
             return []
         boxes = np.array([r['bbox'] for r in results])
@@ -356,12 +330,10 @@ class ONNXDetector:
         return out
 
     def detect(self, frame):
-        # Fixed unpacking: preprocess returns (img, ratio, pad_x, pad_y)
         img, ratio, pad_x, pad_y = self.preprocess(frame)
         ort_inputs = {self.input_name: img}
         outputs = self.session.run(None, ort_inputs)
         preds = outputs[0] if isinstance(outputs, (list, tuple)) else outputs
-        # interpret and convert
         dets = self._interpret_and_convert(preds, ratio=ratio, pad_x=pad_x, pad_y=pad_y, orig_shape=frame.shape[:2])
         if self.debug:
             print(f"[ONNXDetector] parsed {len(dets)} detections")

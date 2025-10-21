@@ -3,32 +3,27 @@
 main_vlm.py - Integrates YOLO object tracking with the LLaVA-34B VLM.
 This version uses a dynamic, semi-transparent text box for VLM output.
 """
-# --- Add the project root to Python's path ---
 import sys
 import os
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
-# ---------------------------------------------------
 
 import argparse
 import time
 import cv2
 import numpy as np
-import subprocess # Import the subprocess module
+import subprocess 
 
-# YOLO/Tracking Imports
 from detector_onnx import ONNXDetector as Detector
 from tracker import CentroidTracker
 
 ALLOWED_CLASSES = {'car', 'truck', 'bus', 'van', 'motorbike', 'motorcycle'}
 
 
-# --- MODIFICATION: New, improved function for drawing the text overlay ---
 def draw_dynamic_text_box(frame, text, org, font=cv2.FONT_HERSHEY_SIMPLEX, font_scale=0.6, color=(0, 255, 255), thickness=1, max_width=500):
     """
     Draws word-wrapped text with a dynamic, semi-transparent background.
     """
-    # Split text into words and determine the number of lines required
     words = text.split(' ')
     lines = []
     current_line = ""
@@ -42,12 +37,10 @@ def draw_dynamic_text_box(frame, text, org, font=cv2.FONT_HERSHEY_SIMPLEX, font_
             current_line = test_line
     lines.append(current_line)
 
-    # Calculate the size of the background box
     (text_width, text_height), _ = cv2.getTextSize("A", font, font_scale, thickness)
     line_spacing = text_height + 12
     box_height = len(lines) * line_spacing + 10
     
-    # Find the longest line to set the box width
     longest_line_width = 0
     for line in lines:
         (w, _), _ = cv2.getTextSize(line, font, font_scale, thickness)
@@ -55,26 +48,19 @@ def draw_dynamic_text_box(frame, text, org, font=cv2.FONT_HERSHEY_SIMPLEX, font_
             longest_line_width = w
     box_width = longest_line_width + 20
 
-    # Create a semi-transparent overlay
     overlay = frame.copy()
     x, y = org
     cv2.rectangle(overlay, (x, y), (x + box_width, y + box_height), (0, 0, 0), -1)
     
-    # Blend the overlay with the original frame
-    alpha = 0.6  # Transparency factor
+    alpha = 0.6  
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
-    # Draw each line of text
     for i, line in enumerate(lines):
         line_y = y + (i + 1) * line_spacing - 5
-        # Draw a black outline for better readability
         cv2.putText(frame, line, (x + 10, line_y), font, font_scale, (0, 0, 0), thickness + 2, cv2.LINE_AA)
-        # Draw the main text
         cv2.putText(frame, line, (x + 10, line_y), font, font_scale, color, thickness, cv2.LINE_AA)
-# -------------------------------------------------------------------------
 
 
-# VLM analysis function using a blocking subprocess
 def get_vlm_analysis(frame, vlm_model_path, python_executable):
     try:
         temp_image_path = "/tmp/vlm_frame.jpg"
@@ -121,7 +107,6 @@ def parse_args():
 def main():
     args = parse_args()
     
-    # This main application ONLY loads the YOLO detector
     print("Loading YOLO detector...")
     detector = Detector(args.model, input_size=640, providers=['CPUExecutionProvider'], conf_thres=args.conf)
     tracker = CentroidTracker(max_missed=12, max_distance=140)
@@ -145,7 +130,6 @@ def main():
         frame_count += 1
         h_img, w_img = frame.shape[:2]
 
-        # Trigger analysis based on frame count
         if frame_count % args.vlm_interval == 0:
             print(f"\n--- Frame {frame_count}: Freezing video for VLM Analysis ---")
             analysis_result = get_vlm_analysis(frame, args.vlm_model_path, python_executable)
@@ -153,7 +137,6 @@ def main():
             print(f"VLM Analysis Result: {vlm_status_text}")
             print("--- VLM Analysis Complete. Resuming video. ---\n")
 
-        # YOLO detection and tracking runs on all frames
         dets = detector.detect(frame)
         all_dets_for_tracker = [{'bbox': d['bbox'], 'class_name': str(d['class_name']).lower()} for d in dets if str(d['class_name']).lower() in ALLOWED_CLASSES]
         tracks = tracker.update(all_dets_for_tracker)
@@ -162,21 +145,17 @@ def main():
             draw_box(frame, t.bbox, label=f'ID:{t.id}', color=(0, 255, 0))
             cv2.circle(frame, t.centroid, 4, (0, 255, 0), -1)
             
-        # --- MODIFICATION: Updated drawing logic ---
-        # Draw the dynamic VLM text box in the top-left corner
         draw_dynamic_text_box(
             frame, 
             f"Scene Analysis: {vlm_status_text}", 
-            org=(15, 15), # Position of the top-left corner of the box
-            max_width=500  # Max width in pixels before text wraps
+            org=(15, 15), 
+            max_width=500  
         )
         
-        # Draw FPS counter in the bottom-left corner
         now = time.time()
         fps_val = 1.0 / (now - prev_time + 1e-8)
         prev_time = now
         cv2.putText(frame, f'FPS: {fps_val:.1f}', (15, h_img - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        # ---------------------------------------------
         
         cv2.imshow('VLM Scene Analysis', frame)
 

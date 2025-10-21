@@ -14,7 +14,6 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe.unsqueeze(0))  # (1, max_len, d_model)
 
     def forward(self, x):
-        # x: (B, T, D)
         L = x.size(1)
         return x + self.pe[:, :L, :]
 
@@ -31,14 +30,11 @@ class TrajectoryTransformer(nn.Module):
         self.n_in = n_in
         self.m_pred = m_pred
         self.d_model = d_model
-        # input projection
         self.input_proj = nn.Linear(2, d_model)
         self.pos_enc = PositionalEncoding(d_model, max_len=max(n_in, m_pred)+10)
         encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout, batch_first=True)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        # global pooling
         self.pool = nn.AdaptiveAvgPool1d(1)
-        # decoder MLP: project pooled encoding to full m_pred*2 output
         self.decoder = nn.Sequential(
             nn.Linear(d_model, d_model//2),
             nn.ReLU(),
@@ -51,14 +47,12 @@ class TrajectoryTransformer(nn.Module):
         z = self.input_proj(x)  # (B, n_in, d_model)
         z = self.pos_enc(z)
         z = self.encoder(z)  # (B, n_in, d_model)
-        # pool over temporal dim
         z_pooled = z.permute(0,2,1)  # (B, d_model, n_in)
         z_p = self.pool(z_pooled).squeeze(-1)  # (B, d_model)
         out = self.decoder(z_p)  # (B, m_pred*2)
         out = out.view(B, self.m_pred, 2)
         return out
 
-# Optional LSTM fallback
 class TrajectoryLSTM(nn.Module):
     def __init__(self, n_in, m_pred, hidden=128, num_layers=2, dropout=0.0):
         super().__init__()
@@ -67,7 +61,6 @@ class TrajectoryLSTM(nn.Module):
 
     def forward(self, x):
         out, _ = self.lstm(x)
-        # use last hidden state
         last = out[:, -1, :]
         out = self.fc(last).view(x.size(0), -1, 2)
         return out

@@ -12,24 +12,19 @@ try:
 except Exception:
     _HAS_YAML = False
 
-# Try to import the legacy color_filter if present (for reuse)
 try:
     from color_filter import is_white_car as legacy_is_white_car
 except Exception:
     legacy_is_white_car = None
 
-# -------------------------
-# Base filter interface
-# -------------------------
+
 class BaseFilter:
     def match(self, frame, bbox, class_name=None):
         """Return True if this detection should be counted."""
         raise NotImplementedError
 
 
-# -------------------------
-# ColorFilter
-# -------------------------
+
 class ColorFilter(BaseFilter):
     """
     Color-based filter using HSV pixel statistics and masks.
@@ -37,7 +32,6 @@ class ColorFilter(BaseFilter):
     color_params: optional dict to override thresholds
     """
 
-    # default parameters per named color (HSV rules)
     DEFAULTS = {
         'white': dict(sat_thresh=65, val_thresh=170, min_frac=0.18),
         'black': dict(val_thresh=60, sat_thresh=120, min_frac=0.15),
@@ -62,7 +56,6 @@ class ColorFilter(BaseFilter):
         val_thresh = int(p.get('val_thresh', 170))
         mask = (v > val_thresh) & (s < sat_thresh)
         mask = (mask).astype('uint8') * 255
-        # small opening
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
         frac = (mask>0).sum() / (mask.size + 1e-8)
@@ -91,7 +84,6 @@ class ColorFilter(BaseFilter):
             if lo <= hi:
                 m = (h >= lo) & (h <= hi)
             else:
-                # wrap-around
                 m = (h >= lo) | (h <= hi)
             mask_tot = mask_tot | (m & (s >= sat_min) & (v >= val_min))
         mask = (mask_tot).astype('uint8') * 255
@@ -104,14 +96,12 @@ class ColorFilter(BaseFilter):
         x1,y1,x2,y2 = map(int, bbox)
         h = max(1, y2 - y1)
         w = max(1, x2 - x1)
-        # crop center-ish / bottom part to reduce roof/window artifacts
         mh = max(1, int(h * self.area_margin))
         mw = max(1, int(w * self.area_margin))
         cy1 = y1 + mh
         cy2 = y2 - 0  # keep bottom
         cx1 = x1 + mw
         cx2 = x2 - mw
-        # bounds
         cy1 = max(0, min(frame.shape[0]-1, cy1))
         cy2 = max(cy1+1, min(frame.shape[0], cy2))
         cx1 = max(0, min(frame.shape[1]-1, cx1))
@@ -128,10 +118,8 @@ class ColorFilter(BaseFilter):
             frac, _ = self._check_black(roi, p)
             return frac >= float(p.get('min_frac', 0.12))
         else:
-            # hue-based (red/blue/...)
             hue_ranges = p.get('hue_ranges', None)
             if hue_ranges is None:
-                # fallback to using legacy if available and color is 'white'
                 if self.color == 'white' and legacy_is_white_car is not None:
                     return legacy_is_white_car(frame, bbox)
                 return False
@@ -141,9 +129,7 @@ class ColorFilter(BaseFilter):
             return frac >= float(p.get('min_frac', 0.06))
 
 
-# -------------------------
-# ClassFilter
-# -------------------------
+
 class ClassFilter(BaseFilter):
     def __init__(self, classes):
         self.allowed = set([c.lower() for c in classes])
@@ -154,9 +140,7 @@ class ClassFilter(BaseFilter):
         return class_name.lower() in self.allowed
 
 
-# -------------------------
-# AreaFilter (bbox area)
-# -------------------------
+
 class AreaFilter(BaseFilter):
     def __init__(self, min_area=None, max_area=None):
         self.min_area = float(min_area) if min_area is not None else None
@@ -172,9 +156,7 @@ class AreaFilter(BaseFilter):
         return True
 
 
-# -------------------------
-# CombinedFilter
-# -------------------------
+
 class CombinedFilter(BaseFilter):
     def __init__(self, filters, mode='and'):
         self.filters = filters
@@ -195,9 +177,7 @@ class CombinedFilter(BaseFilter):
             raise ValueError("Unknown mode for CombinedFilter: " + str(self.mode))
 
 
-# -------------------------
-# Config loader
-# -------------------------
+
 def _load_config(path):
     if path is None:
         return {}
@@ -208,7 +188,6 @@ def _load_config(path):
         if _HAS_YAML and path.lower().endswith(('.yml', '.yaml')):
             return yaml.safe_load(f)
         else:
-            # try json fallback
             try:
                 return json.load(f)
             except Exception:
@@ -264,7 +243,6 @@ def load_filter_from_config(path, name):
     if not cfg:
         return None
     if 'filters' not in cfg:
-        # allow top-level dict of named filters
         cfg_filters = cfg
     else:
         cfg_filters = cfg['filters']

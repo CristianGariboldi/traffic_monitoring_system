@@ -5,8 +5,8 @@ Please check the technical report [Download the PDF file](./docs/Einride_Challen
 Before proceeding, let's create a clean conda environment:
 
 ```
-conda create -n Einride python=3.10 -y
-conda activate Einride
+conda create -n traffic python=3.10 -y
+conda activate traffic
 ```
 
 Make sure to be under root directory of the project and install required packages:
