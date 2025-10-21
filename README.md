@@ -1,4 +1,4 @@
-# Einride_Challenge
+# Traffic Monitoring System
 
 Please check the technical report [Download the PDF file](./docs/Einride_Challenge.pdf), there are detailed explanations of designed model.
 
